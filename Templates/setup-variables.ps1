@@ -35,6 +35,9 @@ Write-Host "Noetica.LogLevel: $EffectiveLogLevel"
 #>
 $AppInstallRoot = $OctopusParameters["Noetica.AppRoot"]
 $AppInstallFrag = $OctopusParameters["Noetica.AppRoot.Fragment"]
+$EtcRoot = $OctopusParameters["Noetica.EtcRoot"]
+$EtcRootFrag = $OctopusParameters["Noetica.EtcRoot.Fragment"]
+$SynthesysInf = $OctopusParameters["Noetica.Inf"]
 <#
   The fragment contains 'Synthesys\NoeticaAPIs'
   The root is a composite variable which contains '#{env:SystemDrive}\#{Noetica.AppRoot.Fragment}'
@@ -44,6 +47,9 @@ $AppInstallFrag = $OctopusParameters["Noetica.AppRoot.Fragment"]
 Write-Host "-- App (requires variable set: 'App hosting')"
 Write-Host "Noetica.AppRoot: $AppInstallRoot"
 Write-Host "Noetica.AppRoot.Fragment: $AppInstallFrag"
+Write-Host "Noetica.EtcRoot: $EtcRoot"
+Write-Host "Noetica.EtcRoot.Fragment: $EtcRootFrag"
+Write-Host "Noetica.Inf: $SynthesysInf"
 
 <#
   Database hosting variables
@@ -120,6 +126,12 @@ Set-OctopusVariable -name "Logging.LogLevel" -value $EffectiveLogLevel
 
 Write-Host "[Application.Root] API Root Directory: $AppInstallRoot"
 Set-OctopusVariable -name "Application.Root" -value $AppInstallRoot
+
+Write-Host "[Application.Etc] Etc Root Directory: $EtcRoot"
+Set-OctopusVariable -name "Application.Etc" -value $EtcRoot
+
+Write-Host "[Application.Synthesys.Inf] Synthesys.Inf Path: $SynthesysInf"
+Set-OctopusVariable -name "Application.Synthesys.Inf" -value $SynthesysInf
 
 Write-Host "[Voice.Root] Voice Root Directory: $VoiceInstallRoot"
 Set-OctopusVariable -name "Voice.Root" -value $VoiceInstallRoot
