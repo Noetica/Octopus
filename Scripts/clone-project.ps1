@@ -521,7 +521,6 @@ try {
         }
         else {
             Write-Host "Cloned.`n"
-            exit 0
         }
     }
 
