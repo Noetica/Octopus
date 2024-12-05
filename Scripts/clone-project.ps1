@@ -8,7 +8,7 @@ param(
     [Parameter(Mandatory = $false)] [string]$ProjectDescription, # Project description
     [Parameter(Mandatory = $false)] [string]$TemplateSpace, # Template space to clone from
     [Parameter(Mandatory = $false)] [string]$TemplateGroup, # Template group to clone from
-    [Parameter(Mandatory = $false)] [boolean]$VerboseOutput = $false # When true, REST actions and matching operations will be logged
+    [Parameter(Mandatory = $false)] [boolean]$VerboseOutput = $true # When true, REST actions and matching operations will be logged
 )
 
 <#
