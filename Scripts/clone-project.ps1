@@ -1,13 +1,14 @@
 param(
-    [Parameter(Mandatory = $false)] [string]$ProjectSpace,          # Target space for the cloned project
-    [Parameter(Mandatory = $false)] [string]$ProjectGroup,          # Target group for the cloned project
-    [Parameter(Mandatory = $false)] [string]$ProjectName,           # Name of the project, e.g. nub_api_reports
-    [Parameter(Mandatory = $false)] [string]$ProjectType,           # Type of project, matching a template slug (api,website)
-    [Parameter(Mandatory = $false)] [string]$ProjectLifecycle,      # Target lifecycle to use (currently from template source)
-    [Parameter(Mandatory = $false)] [string]$ProjectDescription,    # Project description (ReportsAPI)
-    [Parameter(Mandatory = $false)] [string]$TemplateSpace,         # Template space to clone from
-    [Parameter(Mandatory = $false)] [string]$TemplateGroup,         # Template group to clone from
-    [Parameter(Mandatory = $false)] [boolean]$VerboseOutput = $true # When true, REST actions and matching operations will be logged
+    [Parameter(Mandatory = $false)] [string]$ProjectSpace, # Target space for the cloned project
+    [Parameter(Mandatory = $false)] [string]$ProjectGroup, # Target group for the cloned project
+    [Parameter(Mandatory = $false)] [string]$ProjectName, # Name of the project, e.g. nub_api_reports
+    [Parameter(Mandatory = $false)] [string]$ProjectType, # Type of project, matching a template slug (api,website)
+    [Parameter(Mandatory = $false)] [string]$ArtifactName, # Name of the artifact (versionless) or display name, e.g. ReportsAPI
+    [Parameter(Mandatory = $false)] [string]$ProjectLifecycle, # Target lifecycle to use (currently from template source)
+    [Parameter(Mandatory = $false)] [string]$ProjectDescription, # Project description
+    [Parameter(Mandatory = $false)] [string]$TemplateSpace, # Template space to clone from
+    [Parameter(Mandatory = $false)] [string]$TemplateGroup, # Template group to clone from
+    [Parameter(Mandatory = $false)] [boolean]$VerboseOutput = $false # When true, REST actions and matching operations will be logged
 )
 
 <#
@@ -20,6 +21,7 @@ param(
       -ProjectGroup 'Default Project Group' `
       -ProjectName 'nub_clone_example' `
       -ProjectType 'Website' `
+      -ArtifactName 'ExampleCloneWeb'
       -ProjectLifecycle 'Default Lifecycle' `
       -ProjectDescription 'Cloned Project Example' `
       -TemplateSpace 'Default' `
@@ -42,12 +44,23 @@ $Project = @{
         Type        = $ProjectType
     }
     Target   = @{
-        Id          = $null
-        Name        = $ProjectName
-        Space       = @{ Id = $null; Name = $ProjectSpace; }
-        Group       = @{ Id = $null; Name = $ProjectGroup; }
-        Description = $ProjectDescription
-        Slug        = $ProjectName.Replace('_', '-')
+        Id              = $null
+        Name            = $ProjectName
+        Space           = @{ Id = $null; Name = $ProjectSpace; }
+        Group           = @{ Id = $null; Name = $ProjectGroup; }
+        Description     = $ProjectDescription
+        PackageVariable = @{
+            Id          = $null
+            Name        = 'Artifact'
+            Value       = $ArtifactName
+            Type        = 'String'
+            IsSensitive = $false
+        }
+        VariableSet     = @{
+            Id        = $null
+            Variables = $null
+        }
+        Slug            = $ProjectName.Replace('_', '-')
     }
 }
 
@@ -67,6 +80,7 @@ try {
     if ([string]::IsNullOrWhiteSpace($ProjectType)) { throw "Required input parameter 'ProjectType' is empty or was not provided"; exit 1; }
     if ([string]::IsNullOrWhiteSpace($ProjectLifecycle)) { throw "Required input parameter 'ProjectLifecycle' is empty or was not provided"; exit 1; }
     if ([string]::IsNullOrWhiteSpace($ProjectDescription)) { throw "Required input parameter 'ProjectDescription' is empty or was not provided"; exit 1; }
+    if ([string]::IsNullOrWhiteSpace($ArtifactName)) { throw "Required input parameter 'ArtifactName' is empty or was not provided"; exit 1; }
     if ([string]::IsNullOrWhiteSpace($TemplateSpace)) { throw "Required input parameter 'TemplateSpace' is empty or was not provided"; exit 1; }
     if ([string]::IsNullOrWhiteSpace($TemplateGroup)) { throw "Required input parameter 'TemplateGroup' is empty or was not provided"; exit 1; }
 
@@ -507,6 +521,95 @@ try {
         }
         else {
             Write-Host "Cloned.`n"
+            exit 0
+        }
+    }
+
+    <#
+        Modify target project variables
+    #>
+    try {
+        <# Get the project variable set id #>
+        # Set up request
+        $Request.Method = 'GET'
+        $Request.Uri = '{0}/api/{1}/projects/all' -f $Octopus.Uri, $Project.Target.Space.Id
+
+        # Output current action (and request uri if verbose)
+        Write-Host 'Retrieving variable set...'
+        ($VerboseOutput -eq $true) ? (Write-Host $Request.Method $Request.Uri.Replace($Octopus.Uri, '***')) : $null
+
+        # Execute the request
+        $Response = (Invoke-RestMethod @Request) | Where-Object { $_.Name -eq $ProjectName }
+        $Project.Target.VariableSet.Id = $Response.VariableSetId
+
+        if ($null -eq $Project.Target.VariableSet.Id) {
+            Write-Host "Not found.`n"
+
+            throw 'Unable to retrieve project variables.'
+            exit 1
+        }
+        
+        <# Get the project variables #>
+        # Set up request
+        $Request.Method = 'GET'
+        $Request.Uri = '{0}/api/{1}/variables/{2}' -f $Octopus.Uri, $Project.Target.Space.Id, $Project.Target.VariableSet.Id
+
+        # Output current action (and request uri if verbose)
+        Write-Host 'Retrieving project variables...'
+        ($VerboseOutput -eq $true) ? (Write-Host $Request.Method $Request.Uri.Replace($Octopus.Uri, '***')) : $null
+
+        # Execute the request
+        $Response = Invoke-RestMethod @Request
+
+        <# Modify the variable #>
+        # Set up request payload (update project variable)
+        $Body = $Response
+        
+        # Check to see if variable is already present
+        $VariableToUpdate = $Body.Variables | Where-Object { $_.Name -eq $Project.Target.PackageVariable.Name }
+        if ($null -eq $VariableToUpdate) {
+            $Body.Variables += $Project.Target.PackageVariable
+        }
+
+        # Update the value
+        $VariableToUpdate = $Project.Target.PackageVariable
+        
+        # Update the collection
+        # Set up request
+        $Request.Method = 'PUT'
+        $Request.Uri = '{0}/api/{1}/variables/{2}' -f $Octopus.Uri, $Project.Target.Space.Id, $Project.Target.VariableSet.Id
+
+        # Output current action (and request uri if verbose)
+        Write-Host 'Updating variables with artifact name...'
+        ($VerboseOutput -eq $true) ? (Write-Host $Request.Method $Request.Uri.Replace($Octopus.Uri, '***')) : $null
+
+        # Execute the request
+        $Response = Invoke-RestMethod @Request -Body ($Body | ConvertTo-Json -Depth 10)
+
+        <# Verify response value matches input #>
+        
+        $CheckUpdateStatus = $Response.Variables | Where-Object { $_.Name -eq $Project.Target.PackageVariable.Name }
+        if ($null -eq $CheckUpdateStatus) {
+            Write-Host "Not set.`n"
+            Write-Warning ("Variable not set '{0}'`n" -f $Project.Target.PackageVariable.Name)
+        }
+        else {
+            Write-Host (" [✓] Variable '{0}' updated with value '{1}' ({2})" -f $CheckUpdateStatus.Name, $Project.Target.PackageVariable.Value, $CheckUpdateStatus.Id)
+            $Project.Target.PackageVariable.Id = $CheckUpdateStatus.Id
+        }
+    }
+    catch {
+        Write-Error $_
+        throw
+        exit 1
+    }
+    finally {
+        if ($null -eq $Project.Target.PackageVariable.Id) {
+            Write-Host "Not updated.`n"
+            Write-Warning ("Unable to set project variable {0} - manual update required.'`n" -f $Project.Target.PackageVariable.Name)
+        }
+        else {
+            Write-Host "Updated.`n"
             exit 0
         }
     }
