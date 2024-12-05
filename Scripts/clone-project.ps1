@@ -27,8 +27,8 @@ param(
 #>
 
 $Octopus = @{
-    ApiKey = ${{ secrets.OCTOPUS_API_KEY }}
-    Uri    = ${{ vars.OCTOPUS_SERVER_URL }}
+    ApiKey = $env:OCTOPUS_API_KEY
+    Uri    = $env:OCTOPUS_INSTANCE
 }
 
 $Project = @{
