@@ -166,7 +166,7 @@ try {
             Write-Host "No conflict.`n"
         }
         else {
-            Write-Host "Project already exists - exiting.`n"
+            Write-Host "Project already setup - exiting.`n"
             exit 0
         }
     }
