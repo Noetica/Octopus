@@ -22,7 +22,7 @@ $script:maxRetries = 5
 $script:retryDelay = 5 # seconds
 
 # Backup/Restore variables
-$script:backupDir = "$env:TEMP\$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
+$script:backupDir = "$env:TempDirectory\$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
 $script:backupTargets = $null
 
 # Logging: Use override if specified, or default value
