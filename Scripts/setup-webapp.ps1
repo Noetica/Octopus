@@ -1,39 +1,95 @@
 param (
-    [Parameter(Mandatory = $true)] [string]$ApplicationName, # Name of the artifact (versionless) or display name, e.g. ReportsAPI
+    [Parameter(Mandatory = $true)] [string]$AppName, # Name of the artifact (versionless) or display name, e.g. ReportsAPI
     [Parameter(Mandatory = $true)] [string]$SourceDir, # Location of the source artifact to be deployed
     [Parameter(Mandatory = $false)] [string]$SiteRoot = 'Synthesys_General', # Location of the site deployment
-    [Parameter(Mandatory = $true)] [string]$TargetDir # Location of the target deployment directory
+    [Parameter(Mandatory = $true)] [string]$TargetDir, # Location of the target deployment directory
+    [Parameter(Mandatory = $false)] [string[]]$BackupFiles, # Files to preserve when updating existing deployment
+    [Parameter(Mandatory = $false)] [string[]]$Output # Specify a custom location for the log output
 )
 
 <#==================================================#>
-
-# Map params to script-scoped variables
-$script:timestamp = (Get-Date).ToString('yyyyMMdd_HHmmss')
-$script:sourceDir = $SourceDir
-$script:targetDir = $TargetDir
-$script:appName = $ApplicationName
-$script:appPath = "/$script:appName"
 
 # Prerequisites to check before deployment
 $script:requiredFeatures = @('Web-Scripting-Tools')
 $script:requiredModules = @('IISAdministration', 'WebAdministration')
 
 # App & App Pool variables
+$script:appPath = "/$script:appName"
 $script:appPool = $null
-$script:siteName = $SiteRoot
-$script:appPoolName = "$($script:siteName)_$($script:appName)"
+$script:appPoolName = "$($script:siteRoot)_$($script:appName)"
 $script:retryCount = 0
 $script:maxRetries = 5
 $script:retryDelay = 5 # seconds
 
 # Backup/Restore variables
-$script:backupDir = "$env:TEMP\$($script:appName)_$($script:timestamp)"
-$script:appSettings = 'appsettings.json'
-$script:configRelativeBackup = $null
-$script:restoreAppSettings = $false
+$script:backupDir = "$env:TEMP\$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
+$script:backupTargets = $null
 
-# Deployment appsettings path
-$script:configRelativeTarget = $null
+# Logging: Use override if specified, or default value
+$script:logFile = if ($null -ne $Output) { $Output } else { "$($script:backupDir).log" }
+
+<#==================================================#>
+
+class Util {
+    # Property for log file path
+    [string]$logFile
+
+    # Constructor to initialize the log file path
+    Util([string]$logFilePath) {
+        $this.LogFile = $logFilePath
+    }
+
+    # Log method
+    [void] Log([string]$level, [string]$message) {
+        $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        $logItem = "[$timestamp] [$level] $message"
+
+        # Output to console
+        Write-Host $logItem
+        
+        # Write to log file
+        try {
+            Add-Content -Path $this.LogFile -Value $logItem
+        }
+        catch {
+            Write-Host "Failed to write to log file: $_" -ForegroundColor Red
+        }
+    }
+
+    <#
+        [util] Get relative path of a file in a target directory
+        Output the file and the relative path, or null if not found
+    #>
+    [hashtable] GetRelativePath([string]$directory, [string]$filename) {
+        $match = @{
+            file         = $null
+            filename     = $filename
+            relativePath = $null
+        }
+        $this.Log("Info", "Searching $directory for $($filename)")
+        $match.file = Get-ChildItem -Path $directory -Recurse -File -Filter $filename -ErrorAction SilentlyContinue
+        if ($match.file) {
+            # Check if the file is nested
+            $match.relativePath = $($match.file.FullName.Substring($directory.Length).TrimStart('\'))
+            if ($match.relativePath.Contains('\')) {
+                $match.relativePath = Split-Path $match.relativePath -Parent
+                $this.Log("Info", "File found. ($($match.relativePath)\$filename)")
+            }
+            else {
+                $this.Log("Info", "File found. ($filename)")
+            }
+        }
+        else {
+            $this.Log("Warning", "File not found. ($($filename))")
+        }
+        if ($match.file) {
+            return $match
+        }
+        else {
+            return $null
+        }
+    }
+}
 
 <#==================================================#>
 
@@ -41,38 +97,61 @@ $script:configRelativeTarget = $null
     Install/Import prerequisite features and modules used by the deployment script
 #>
 function SetupHostPrerequisites() {
-    Write-Host 'Checking feature requirements...'
+    $util.Log("Info", 'Checking feature requirements...')
     foreach ($name in $script:requiredFeatures) {
         $feature = Get-WindowsFeature -Name $name
         if ($null -eq $feature) {
-            Write-Host " [X] Feature '$name' is not available on this system." -ForegroundColor Red
+            $util.Log("Critical", "Feature '$name' is not available on this system.")
         }
         elseif ($name.Installed) {
-            Write-Host " [✓] Feature '$name' is installed." -ForegroundColor Green
+            $util.Log("Debug", "Feature '$name' is installed.")
         }
         else {
-            Write-Host " [!] Feature '$name' is available but not installed. Installing..." -ForegroundColor Yellow
-            Install-WindowsFeature -Name $name -IncludeManagementTools
-            Write-Host " [✓] Feature '$name' installed successfully." -ForegroundColor Green
+            $util.Log("Debug", "Feature '$name' is available but not installed. Installing...")
+
+            try {
+                Install-WindowsFeature -Name $name -IncludeManagementTools
+                $util.Log("Debug", "Feature '$name' installed successfully.")
+            }
+            catch {
+                $util.Log("Critical", "Feature '$name' failed to import.")
+                $util.Log("Error", $_)
+            }
         }
     }
 
-    Write-Host 'Checking module requirements...'
+    $util.Log("Info", 'Checking module requirements...')
     foreach ($name in $script:requiredModules) {
         if (-not (Get-Module -Name $name)) {
-            Write-Host " [!] Module '$name' is not imported. Importing..." -ForegroundColor Yellow
+            $util.Log("Debug", "Module '$name' is not imported. Importing...")
             try {
                 Import-Module $name -ErrorAction Stop
-                Write-Host " [✓] Module '$name' imported successfully." -ForegroundColor Green
+                $util.Log("Debug", "Module '$name' imported successfully.")
             }
             catch {
-                Write-Host " [X] Module '$name' failed to import." -ForegroundColor Red
-                Write-Error $_
+                $util.Log("Critical", "Module '$name' failed to import.")
+                $util.Log("Error", $_)
             }
         }
         else {
-            Write-Host " [✓] Module '$name' is imported." -ForegroundColor Green
+            $util.Log("Debug", "Module '$name' is imported.")
         }
+    }
+}
+
+<#
+    Configure backup/restore targets from $BackupFiles list
+#>
+function ConfigureBackupRestore() {
+    $script:backupTargets = New-Object System.Collections.Generic.List[Hashtable]
+    foreach ($filename in $BackupFiles) {
+        $util.Log("Debug", "Adding backup/restore target. ($filename)")
+        $script:backupTargets.Add(
+            [Hashtable]@{
+                filename     = $filename
+                relativePath = $null
+            }
+        )
     }
 }
 
@@ -82,11 +161,11 @@ function SetupHostPrerequisites() {
     - Not exists: Create App Pool
 #>
 function CheckAndCreateAppPool() {
-    Write-Host "Checking '$script:appName' App Pool..."
+    $util.Log("Info", "Checking '$script:appName' App Pool...")
     # Use Get-IISServerManager to retrieve the Application Pool
     $script:appPool = $script:serverManager.ApplicationPools[$script:appPoolName]
     if ($null -eq $script:appPool) {
-        Write-Host ' [!] App Pool missing. Creating...' -ForegroundColor Yellow
+        $util.Log("Warning", 'App Pool missing. Creating...')
         try {
             # Create a new Application Pool
             $appPool = $script:serverManager.ApplicationPools.Add($script:appPoolName)
@@ -103,7 +182,7 @@ function CheckAndCreateAppPool() {
             # Commit changes
             $script:serverManager.CommitChanges()
 
-            Write-Host " [✓] App Pool created. ($script:appPoolName)" -ForegroundColor Green
+            $util.Log("Info", "App Pool created. ($script:appPoolName)")
             $script:appPool = $script:serverManager.ApplicationPools[$script:appPoolName]
         }
         catch {
@@ -111,13 +190,13 @@ function CheckAndCreateAppPool() {
         }
     }
     else {
-        Write-Host " [✓] App Pool exists. ($script:appPoolName)" -ForegroundColor Green
+        $util.Log("Info", "App Pool exists. ($script:appPoolName)")
     }
     
     if ($null -ne $script:appPool) {
         do {
             if ($script:appPool.State -eq 'Started') {
-                Write-Host ' [!] App Pool running. Stopping...' -ForegroundColor Yellow
+                $util.Log("Warning", 'App Pool running. Stopping...')
                 Stop-WebAppPool -Name $script:appPoolName
         
                 # Wait until the app pool is stopped
@@ -126,25 +205,25 @@ function CheckAndCreateAppPool() {
                     $appPoolState = Get-WebAppPoolState $script:appPoolName
         
                     if ($script:appPool.State -eq 'Stopped') {
-                        Write-Host ' [✓] App Pool stopped.' -ForegroundColor Green
+                        $util.Log("Info", 'App Pool stopped.')
                         break
                     }
                     else {
-                        Write-Host "Waiting for App Pool to stop. Current state: $($appPoolState.Value)"
+                        $util.Log("Debug", "Waiting for App Pool to stop. Current state: $($appPoolState.Value)")
                     }
                 }
         
                 if ($script:retryCount -eq $script:maxRetries) {
-                    Write-Host " [X] Failed to stop App Pool after $script:maxRetries attempts." -ForegroundColor Red
+                    $util.Log("Error", "Failed to stop App Pool after $script:maxRetries attempts.")
                 }
                 break
             }
             elseif ($script:appPool.State -eq 'Stopped') {
-                Write-Host ' [✓] App Pool stopped.' -ForegroundColor Green
+                $util.Log("Info", 'App Pool stopped.')
                 break
             }
             else {
-                Write-Host " [!] App Pool transitioning. Retry in $script:retryDelay seconds..." -ForegroundColor Yellow
+                $util.Log("Debug", "App Pool transitioning. Retry in $script:retryDelay seconds...")
                 Start-Sleep -Seconds $script:retryDelay
                 $script:retryCount++
             }
@@ -152,7 +231,7 @@ function CheckAndCreateAppPool() {
         } while ($script:retryCount -lt $script:maxRetries)
         
         if ($script:retryCount -eq $script:maxRetries) {
-            Write-Host " [X] Failed to transition App Pool out of the transitional state after $script:maxRetries attempts." -ForegroundColor Red
+            $util.Log("Error", "Failed to transition App Pool out of the transitional state after $script:maxRetries attempts.")
         }
     }
 }
@@ -162,29 +241,45 @@ function CheckAndCreateAppPool() {
     - If exists: Locate and Backup appsettings.json
 #>
 function CheckExistingDeployment() {
-    Write-Host 'Checking existing deployments...'
+    $util.Log("Info", 'Checking existing deployments...')
     if (Test-Path $script:targetDir) {
-        $targetAppSettings = UtilLocateAppsettings -lookupDir $script:targetDir
-        if ($null -ne $targetAppSettings.file) {
-            Write-Host " [!] Existing deployment found. Saving configuration ($($targetAppSettings.relativePath))..." -ForegroundColor Yellow
-            if ($targetAppSettings.relativePath.Contains('\')) {
-                $script:configRelativeBackup = Split-Path $targetAppSettings.relativePath -Parent
+        $util.Log("Debug", "Checking target path ($script:targetDir)")
+        $targetsToRemove = @()
+        foreach ($target in $script:backupTargets) {
+            $result = $script:util.GetRelativePath($script:targetDir, $target.filename)
+            if ($null -ne $result) {
+                $util.Log("Info", "Backing up ($($target.filename))...")
+                $target.file = $result.file
+                $target.relativePath = $result.relativePath
+
+                # Handle multiple relativePath values
+                foreach ($relativePath in $result.relativePath) {
+                    # Calculate the backup directory
+                    $backupPath = $script:backupDir
+                    if ($null -ne $relativePath) {
+                        $backupPath = Join-Path -Path $script:backupDir -ChildPath (Split-Path -Path $relativePath -Parent)
+                        (New-Item -Path $backupPath -ItemType Directory -Force) | Out-Null
+                    }
+                    # Copy the file to the correct directory
+                    $destinationFile = Join-Path -Path $backupPath -ChildPath $target.filename
+                    Copy-Item -Path $result.file.FullName -Destination $destinationFile -Force
+                    if (Test-Path $destinationFile) {
+                        $util.Log("Info", "Saved successfully. ($destinationFile).")
+                    }
+                }
             }
-            # Create directory
-            (New-Item -Path $script:backupDir -ItemType Directory -Force) | Out-Null
-            # Backup
-            Copy-Item -Path $targetAppSettings.file.FullName -Destination "$script:backupDir\$script:appSettings" -Force
-            if (Test-Path "$script:backupDir\$script:appSettings") {
-                Write-Host " [✓] Saved successfully. ($script:backupDir\$script:appSettings)." -ForegroundColor Green
-                $script:restoreAppSettings = $true
+            else {
+                # Mark the target for removal
+                $targetsToRemove += $target
             }
         }
-        else {
-            Write-Host ' No configuration found.'
+        foreach ($target in $targetsToRemove) {
+            $util.Log("Debug", "Removing backup/restore target. ($($target.filename))")
+            $script:backupTargets.Remove($target) | Out-Null
         }
     }
     else {
-        Write-Host ' No deployments found.'
+        $util.Log("Info", 'No deployments found.')
     }
 }
 
@@ -193,52 +288,36 @@ function CheckExistingDeployment() {
     Transfer files from $script:sourceDir to $script:targetDir
 #>
 function DeployLatestArtifact() {
-    Write-Host 'Clearing deployment target directory...'
+    $util.Log("Debug", 'Clearing deployment target directory...')
     Remove-Item -Recurse -Force $script:targetDir -ErrorAction SilentlyContinue
-    Write-Host ' [✓] Cleared target directory.' -ForegroundColor Green
-    Write-Host 'Deploying latest artifact...'
-    Copy-Item -Path $script:sourceDir -Destination $script:targetDir -Recurse -Exclude 'appsettings.json'
-    Write-Host ' [✓] Copied files from artifact.' -ForegroundColor Green
+    $util.Log("Debug", 'Cleared target directory.')
+    $util.Log("Info", 'Deploying latest artifact...')
+    # Extract the filenames from backupTargets where a backup was successful
+    $fileBackups = $script:backupTargets | Where-Object { $null -ne $_.file } | ForEach-Object { $_.filename }
+    # Copy items from source directory, excluding any files with backups
+    Copy-Item -Path $script:sourceDir -Destination $script:targetDir -Recurse -Exclude $fileBackups -Verbose
+    $util.Log("Info", 'Copied files from artifact.')
 }
 
 <#
-    Copy/Restore appsettings
-    - If appsettings was backed-up: Restore to original location
-    - If appsettings was not backed-up: Transfer from $script:sourceDir
+    Restore backups
 #>
-function DeployConfiguration() {
-    if ($script:restoreAppSettings) {
-        Write-Host 'Restoring configuration from backup...'
-        if ($script:configRelativeBackup) {
-            (New-Item -Path "$script:targetDir\$script:configRelativeBackup" -ItemType Directory -Force) | Out-Null
-            Copy-Item -Path "$script:backupDir\$script:appSettings" -Destination "$script:targetDir\$script:configRelativeBackup\$script:appSettings"
-            Write-Host " [✓] Restored to relative path. ($script:targetDir\$script:configRelativeBackup\$script:appSettings)." -ForegroundColor Green
-        }
-        else {
-            Copy-Item -Path "$script:backupDir\$script:appSettings" -Destination "$script:targetDir\$script:appSettings"
-            Write-Host " [✓] Restored to root. ($script:targetDir\$script:appSettings)." -ForegroundColor Green
-        }
-    }
-    else {
-        Write-Host 'Copying configuration from artifact...'
-        $sourceAppSettings = UtilLocateAppsettings -lookupDir $script:sourceDir
-        if ($null -ne $sourceAppSettings.file) {
-            if ($sourceAppSettings.relativePath.Contains('\')) {
-                $script:configRelativeTarget = Split-Path $sourceAppSettings.relativePath -Parent
+function RestoreBackups() {
+    $hasFileBackups = $script:backupTargets | Where-Object { $null -ne $_.file } | ForEach-Object { $true } | Select-Object -First 1
+    $hasFileBackups = [bool]$hasFileBackups
+    if ($hasFileBackups) {
+        $util.Log("Info", 'Restoring backups...')
+        foreach ($target in $script:backupTargets) {
+            foreach ($path in $target.relativePath) {
+                $util.Log("Info", "Restoring ($($path))...")
+                $source = "$script:backupDir\$path"
+                $util.Log("Debug", "Backup: ($source)")
+                $target = "$script:targetDir\$path"
+                Copy-Item -Path $source -Destination $target -Force
+                if (Test-Path $target) {
+                    $util.Log("Info", "Restored successfully. ($target).")
+                }
             }
-
-            if ($script:configRelativeTarget) {
-                (New-Item -Path "$script:targetDir\$script:configRelativeTarget" -ItemType Directory -Force) | Out-Null
-                Copy-Item -Path "$script:sourceDir\$script:configRelativeTarget\$script:appSettings" -Destination "$script:targetDir\$script:configRelativeTarget\$script:appSettings"
-                Write-Host " [✓] Copied to relative path. ($script:targetDir\$script:configRelativeTarget\$script:appSettings)." -ForegroundColor Green
-            }
-            else {
-                Write-Host " [✓] Copied to root. ($script:targetDir\$script:appSettings)." -ForegroundColor Green
-                Copy-Item -Path "$script:sourceDir\$script:appSettings" -Destination "$script:targetDir\$script:appSettings"
-            }
-        }
-        else {
-            Write-Host ' [X] No configuration found.' -ForegroundColor Red
         }
     }
 }
@@ -247,13 +326,13 @@ function DeployConfiguration() {
     Set-up the application on the default website, or website specified in $SiteRoot
 #>
 function SetupWebApplication() {
-    Write-Host 'Checking applications...'
-    $site = $script:serverManager.Sites[$script:siteName]
-    Write-Host " [✓] Located target site. ($script:siteName)" -ForegroundColor Green
+    $util.Log("Info", 'Checking applications...')
+    $site = $script:serverManager.Sites[$script:siteRoot]
+    $util.Log("Debug", "Located target site. ($script:siteRoot)")
     
     $existingApp = $site.Applications | Where-Object { $_.Path -eq $script:appPath }
     if ($null -eq $existingApp) {
-        Write-Host ' [!] Application missing. Creating...' -ForegroundColor Yellow
+        $util.Log("Warning", 'Application missing. Creating...')
 
         # Add the new application to the site
         $newApp = $site.Applications.Add($script:appPath, $script:targetDir)
@@ -267,14 +346,14 @@ function SetupWebApplication() {
         # Check the app was created
         $createdApp = $site.Applications | Where-Object { $_.Path -eq $script:appPath }
         if ($null -eq $existingApp) {
-            Write-Host " [✓] Application created. ($($createdApp.Path))." -ForegroundColor Green
+            $util.Log("Info", "Application created. ($($createdApp.Path)).")
         }
         else {
-            Write-Host ' [X] Application not created.' -ForegroundColor Red
+            $util.Log("Critical", 'Application not created.')
         }
     }
     else {
-        Write-Host " [✓] Application already exists. ($($existingApp.Path))." -ForegroundColor Green
+        $util.Log("Info", "Application already exists. ($($existingApp.Path)).")
     }
 }
 
@@ -282,7 +361,7 @@ function SetupWebApplication() {
     Start the app pool, wait for it to start
 #>
 function StartAppPool() {
-    Write-Host 'Starting App Pool...'
+    $util.Log("Info", 'Starting App Pool...')
     do {
         if ($script:appPool.State -eq 'Stopped') {
             Start-WebAppPool -Name $script:appPoolName
@@ -293,72 +372,48 @@ function StartAppPool() {
                 $appPoolState = Get-WebAppPoolState $script:appPoolName
         
                 if ($script:appPool.State -eq 'Started') {
-                    Write-Host ' [✓] App Pool started.' -ForegroundColor Green
+                    $util.Log("Info", 'App Pool started.')
                     break
                 }
                 else {
-                    Write-Host "Waiting for App Pool to start. Current state: $($appPoolState.Value)"
+                    $util.Log("Debug", "Waiting for App Pool to start. Current state: $($appPoolState.Value)")
                 }
             }
         
             if ($script:retryCount -eq $script:maxRetries) {
-                Write-Host " [X] Failed to start App Pool after $script:maxRetries attempts." -ForegroundColor Red
+                $util.Log("Error", "Failed to start App Pool after $script:maxRetries attempts.")
             }
             break
         }
         elseif ($script:appPool.State -eq 'Started') {
-            Write-Host ' [✓] App Pool started.' -ForegroundColor Green
+            $util.Log("Info", 'App Pool started.')
             break
         }
         else {
-            Write-Host " [!] App Pool transitioning. Retry in $script:retryDelay seconds..." -ForegroundColor Yellow
+            $util.Log("Debug", "App Pool transitioning. Retry in $script:retryDelay seconds...")
             Start-Sleep -Seconds $script:retryDelay
             $script:retryCount++
         }
     } while ($script:retryCount -lt $script:maxRetries)
         
     if ($script:retryCount -eq $script:maxRetries) {
-        Write-Host " [X] Failed to transition App Pool out of the transitional state after $script:maxRetries attempts." -ForegroundColor Red
+        $util.Log("Error", "Failed to transition App Pool out of the transitional state after $script:maxRetries attempts.")
     }
-}
-
-<#
-    [util] shared function
-    Locate appsettings in a specified directory and output the file, and the relative path
-#>
-function UtilLocateAppsettings() {
-    param ([string]$lookupDir)
-    $match = @{
-        file         = $null 
-        relativePath = $null
-    }
-    Write-Host " Searching $lookupDir..."
-    if (Test-Path $lookupDir) {
-        $match.file = Get-ChildItem -Path $lookupDir -Recurse -File -Filter $script:appSettings
-        if ($match.file) {
-            # Check if the appsettings is nested
-            $match.relativePath = $($match.file.FullName.Substring($lookupDir.Length).TrimStart('\'))
-            Write-Host " [✓] Located configuration. ($($match.relativePath))" -ForegroundColor Green
-        }
-        else {
-            Write-Host " Unable to locate file ($script:appSettings)."
-        }
-    }
-    else {
-        Write-Host " Unable to locate directory ($lookupDir)."
-    }
-    return $match
 }
 
 <#==================================================#>
 
-<# Run the deployment step functions #>
+$util = [Util]::new($script:logFile) # Create an instance of the Util class
 
 SetupHostPrerequisites # Check required features and modules are available and install/import
+ConfigureBackupRestore # Set the backup/restore targets for the deployment
+
 $script:serverManager = Get-IISServerManager # Initialize script-scoped serverManager variable
 CheckAndCreateAppPool # Create if missing, stop the app pool
 CheckExistingDeployment # Lookup previous deployment and backup appsettings
 DeployLatestArtifact # Copy latest artifact files from source
-DeployConfiguration # Restore appsettings or copy from source
+RestoreBackups # Restore any files that were backed up during deployment
 SetupWebApplication # Create web application and map paths
 StartAppPool # Start up the app pool
+
+Write-Host "Deployment run completed. Full log file can be found at $script:logFile."
