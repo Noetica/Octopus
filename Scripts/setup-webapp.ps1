@@ -20,7 +20,7 @@ $script:retryCount = 0
 $script:maxRetries = 5
 $script:retryDelay = 5 # seconds
 # Backup/Restore variables
-$script:backupDir = $OctopusParameters["Octopus.Tentacle.Agent.ApplicationDirectoryPath"]+"\Logs\"+"$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
+$script:backupDir = "$env:TentacleHome"+"\Logs\"+"$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
 $script:backupTargets = $null
 # Logging: Use override if specified, or default value
 $script:logFile = if ($null -ne $Output) { $Output } else { "$($script:backupDir).log" }
