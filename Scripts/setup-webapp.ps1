@@ -298,8 +298,18 @@ function DeployLatestArtifact() {
             $util.Log('Critical', 'Directory not created.')
         }
     }
-    # Copy the contents of the directory, not the directory itself, by appending a ChildPath of '*'
-    Copy-Item -Path (Join-Path -Path $script:sourceDir -ChildPath '*') -Destination $script:targetDir -Recurse -Exclude $fileBackups -Verbose
+    $itemsToCopy = Get-ChildItem -Path $script:sourceDir -Recurse | Where-Object { $fileBackups -notcontains $_.Name }
+    foreach ($item in $itemsToCopy) {
+        $relativePath = $item.FullName.Substring($script:sourceDir.Length).TrimStart('\')
+        $destinationPath = Join-Path -Path $script:targetDir -ChildPath $relativePath
+        if ($item.PSIsContainer) {
+            $util.Log('Debug', "Creating directory: $destinationPath")
+            New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
+        } else {
+            $util.Log('Info', "Copying file: $($item.FullName) to $destinationPath")
+            Copy-Item -Path $item.FullName -Destination $destinationPath -Force
+        }
+    }
     $util.Log('Info', 'Copied files from artifact.')
 }
 
