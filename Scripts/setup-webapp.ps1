@@ -298,7 +298,8 @@ function DeployLatestArtifact() {
             $util.Log('Critical', 'Directory not created.')
         }
     }
-    Copy-Item -Path $script:sourceDir -Destination $script:targetDir -Recurse -Exclude $fileBackups -Verbose
+    # Copy the contents of the directory, not the directory itself, by appending a ChildPath of '*'
+    Copy-Item -Path (Join-Path -Path $script:sourceDir -ChildPath '*') -Destination $script:targetDir -Recurse -Exclude $fileBackups -Verbose
     $util.Log('Info', 'Copied files from artifact.')
 }
 
