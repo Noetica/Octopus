@@ -109,6 +109,7 @@ function SetupHostPrerequisites() {
             catch {
                 $util.Log('Critical', "Feature '$name' failed to import.")
                 $util.Log('Error', $_)
+                exit 1
             }
         }
     }
@@ -124,6 +125,7 @@ function SetupHostPrerequisites() {
             catch {
                 $util.Log('Critical', "Module '$name' failed to import.")
                 $util.Log('Error', $_)
+                exit 1
             }
         }
         else {
@@ -251,7 +253,7 @@ function CheckExistingDeployment() {
                     $backupPath = $script:backupDir
                     if ($null -ne $relativePath) {
                         $backupPath = Join-Path -Path $script:backupDir -ChildPath (Split-Path -Path $relativePath -Parent)
-                        (New-Item -Path $backupPath -ItemType Directory -Force) | Out-Null
+                        New-Item -Path $backupPath -ItemType Directory -Force | Out-Null
                     }
                     # Copy the file to the correct directory
                     $destinationFile = Join-Path -Path $backupPath -ChildPath $target.filename
@@ -287,27 +289,47 @@ function DeployLatestArtifact() {
     $util.Log('Info', 'Deploying latest artifact...')
     # Extract the filenames from backupTargets where a backup was successful
     $fileBackups = $script:backupTargets | Where-Object { $null -ne $_.file } | ForEach-Object { $_.filename }
-    # Copy items from source directory, excluding any files with backups
+    # If target directory doesn't exist, create and check it was created
     if (!(Test-Path $script:targetDir)) {
         $util.Log('Debug', 'Creating target directory...')
-        (New-Item -ItemType Directory -Path $script:targetDir -Force) | Out-Null
+        New-Item -ItemType Directory -Path $script:targetDir -Force | Out-Null
         if (Test-Path $script:targetDir) {
             $util.Log('Debug', "Directory created successfully. ($($script:targetDir))")
         }
         else {
-            $util.Log('Critical', 'Directory not created.')
+            $util.Log('Critical', "Directory not created. ($($script:targetDir))")
+            exit 1
         }
     }
+    # Copy items from source directory, excluding any files with backups
     $itemsToCopy = Get-ChildItem -Path $script:sourceDir -Recurse | Where-Object { $fileBackups -notcontains $_.Name }
     foreach ($item in $itemsToCopy) {
         $relativePath = $item.FullName.Substring($script:sourceDir.Length).TrimStart('\')
         $destinationPath = Join-Path -Path $script:targetDir -ChildPath $relativePath
         if ($item.PSIsContainer) {
-            $util.Log('Debug', "Creating directory: $destinationPath")
+            # If item is a directory, create it and check it was created
+            $util.Log('Debug', "Creating directory ($($item.Name))...")
+            $util.Log('Debug', "Source: ($($item.FullName))")
+            $util.Log('Debug', "Target: ($($destinationPath))")
             New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
+            if (Test-Path $destinationPath) {
+                $util.Log('Debug', "Directory created successfully.")
+            } else {
+                $util.Log('Critical', "Directory not created. ($($destinationPath))")
+                exit 1
+            }
         } else {
-            $util.Log('Info', "Copying file: $($item.FullName) to $destinationPath")
+            # If item is a file, copy it and check it was created
+            $util.Log('Info', "Copying ($($item.Name))...")
+            $util.Log('Debug', "Source: ($($item.FullName))")
+            $util.Log('Debug', "Target: ($destinationPath)")
             Copy-Item -Path $item.FullName -Destination $destinationPath -Force
+            if (Test-Path $destinationPath) {
+                $util.Log('Info', "Copied successfully.")
+            } else {
+                $util.Log('Critical', "File not copied. ($(item.FullName))")
+                exit 1
+            }
         }
     }
     $util.Log('Info', 'Copied files from artifact.')
@@ -364,6 +386,7 @@ function SetupWebApplication() {
         }
         else {
             $util.Log('Critical', 'Application not created.')
+            exit 1
         }
     }
     else {
