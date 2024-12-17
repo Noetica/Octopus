@@ -73,7 +73,7 @@ class Util {
             }
         }
         else {
-            $this.Log('Warning', "File not found. ($($filename))")
+            $this.Log('Warn', "File not found. ($($filename))")
         }
         if ($match.file) {
             return $match
@@ -160,7 +160,7 @@ function CheckAndCreateAppPool() {
     # Use Get-IISServerManager to retrieve the Application Pool
     $script:appPool = $script:serverManager.ApplicationPools[$script:appPoolName]
     if ($null -eq $script:appPool) {
-        $util.Log('Warning', 'App Pool missing. Creating...')
+        $util.Log('Warn', 'App Pool missing. Creating...')
         try {
             # Create a new Application Pool
             $appPool = $script:serverManager.ApplicationPools.Add($script:appPoolName)
@@ -191,7 +191,7 @@ function CheckAndCreateAppPool() {
     if ($null -ne $script:appPool) {
         do {
             if ($script:appPool.State -eq 'Started') {
-                $util.Log('Warning', 'App Pool running. Stopping...')
+                $util.Log('Warn', 'App Pool running. Stopping...')
                 Stop-WebAppPool -Name $script:appPoolName
         
                 # Wait until the app pool is stopped
@@ -368,7 +368,7 @@ function SetupWebApplication() {
     
     $existingApp = $site.Applications | Where-Object { $_.Path -eq $script:appPath }
     if ($null -eq $existingApp) {
-        $util.Log('Warning', 'Application missing. Creating...')
+        $util.Log('Warn', 'Application missing. Creating...')
 
         # Add the new application to the site
         $newApp = $site.Applications.Add($script:appPath, $script:targetDir)
