@@ -15,6 +15,29 @@ Write-Host "## Deployment source: '$SourceDir'"
 Write-Host "## Target root: '$TargetRoot'"
 Write-Host "## Deployment target: '$TargetDir'"
 
+function ControlService {
+    param (
+        [string]$apiRequested,
+        [string]$operation
+    )
+    if ([string]::IsNullOrEmpty($apiRequested)) {
+        New-ItemProperty -Path 'HKLM:\Software\Noetica\Synthesys\Services\ControlPanel' -Name 'Request' -Value "${operation}" 
+    }
+    else {
+        $applications = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Noetica\Synthesys\Services\ServicesManager'
+        foreach ($object_properties in $applications.PsObject.Properties) {
+            $matches = $object_properties.Value -Match $apiRequested
+            if ($matches) {
+                $name = $object_properties.Name
+                New-ItemProperty -Path 'HKLM:\Software\Noetica\Synthesys\Services\ControlPanel' -Name 'Request' -Value "${operation}:${name}" 
+            }
+        }
+    }
+}
+
+Write-Host "## Stopping $PackageName..."
+ControlService -apiRequested $PackageName -operation 'Stop'
+
 if (-not (Test-Path -Path $TargetDir)) {
     New-Item -ItemType Directory -Path $TargetDir
     Write-Host "Directory created: $TargetDir"
@@ -62,3 +85,6 @@ Get-ChildItem -Path $SourceDir -Recurse -File | ForEach-Object {
 
 }
 Write-Host "## Copied $copiedFileCount of $totalToCopyCount"
+
+Write-Host "## Starting $PackageName..."
+ControlService -apiRequested $PackageName -operation 'Start'
