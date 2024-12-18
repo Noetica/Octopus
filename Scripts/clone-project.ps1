@@ -599,7 +599,7 @@ try {
         $Request.Uri = '{0}/api/{1}/variables/{2}' -f $Octopus.Uri, $Project.Target.Space.Id, $Project.Target.VariableSet.Id
 
         # Output current action (and request uri if verbose)
-        Write-Host 'Updating variables with artifact name...'
+        Write-Host 'Updating variables...'
         ($VerboseOutput -eq $true) ? (Write-Host $Request.Method $Request.Uri.Replace($Octopus.Uri, '***')) : $null
 
         # Execute the request
@@ -636,22 +636,11 @@ try {
     }
     finally {
         if ($null -eq $Project.Target.PackageVariable.Id) {
-            Write-Host "Not updated.`n"
-            Write-Warning ("Unable to set project variable {0} - manual update required.`n" -f $Project.Target.PackageVariable.Name)
+            Write-Host "Variables not updated, manual check required.`n"
         }
         else {
-            Write-Host "Updated. $($Project.Target.PackageVariable.Name)"
+            Write-Host "Variables updated."
             exit 0
-        }
-        if ($null -ne $Project.Target.PortVariable.Value) {
-            if ($null -eq $Project.Target.PortVariable.Id) {
-                Write-Host "Not updated.`n"
-                Write-Warning ("Unable to set project variable {0} - manual update required.`n" -f $Project.Target.PackageVariable.Name)
-            }
-            else {
-                Write-Host "Updated. $($Project.Target.PortVariable.Name)"
-                exit 0
-            }
         }
     }
 }
