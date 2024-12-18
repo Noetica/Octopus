@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory = $false)] [string]$ProjectGroup, # Target group for the cloned project
     [Parameter(Mandatory = $false)] [string]$ProjectName, # Name of the project, e.g. nub_api_reports
     [Parameter(Mandatory = $false)] [string]$ProjectType, # Type of project, matching a template slug (api,website)
+    [Parameter(Mandatory = $false)] [string]$DefaultPort, # Port mapping if the project requires one to be set
     [Parameter(Mandatory = $false)] [string]$ArtifactName, # Name of the artifact (versionless) or display name, e.g. ReportsAPI
     [Parameter(Mandatory = $false)] [string]$ProjectLifecycle, # Target lifecycle to use (currently from template source)
     [Parameter(Mandatory = $false)] [string]$ProjectDescription, # Project description
@@ -53,6 +54,13 @@ $Project = @{
             Id          = $null
             Name        = 'Artifact'
             Value       = $ArtifactName
+            Type        = 'String'
+            IsSensitive = $false
+        }
+        PortVariable    = @{
+            Id          = $null
+            Name        = 'Port'
+            Value       = $DefaultPort
             Type        = 'String'
             IsSensitive = $false
         }
@@ -564,15 +572,27 @@ try {
         # Set up request payload (update project variable)
         $Body = $Response
         
-        # Check to see if variable is already present
-        $VariableToUpdate = $Body.Variables | Where-Object { $_.Name -eq $Project.Target.PackageVariable.Name }
-        if ($null -eq $VariableToUpdate) {
+        # Check to see if the Package variable is already present
+        $PackageVariableToUpdate = $Body.Variables | Where-Object { $_.Name -eq $Project.Target.PackageVariable.Name }
+        if ($null -eq $PackageVariableToUpdate) {
             $Body.Variables += $Project.Target.PackageVariable
         }
 
         # Update the value
-        $VariableToUpdate = $Project.Target.PackageVariable
-        
+        $PackageVariableToUpdate = $Project.Target.PackageVariable
+
+        # Check to see if the Port variable is required by the project
+        if ($null -ne $Project.Target.PortVariable.Value) {
+            # Check to see if the Port variable is already present
+            $PortVariableToUpdate = $Body.Variables | Where-Object { $_.Name -eq $Project.Target.PortVariable.Name }
+            if ($null -eq $PortVariableToUpdate) {
+                $Body.Variables += $Project.Target.PortVariable
+            }
+    
+            # Update the value
+            $PortVariableToUpdate = $Project.Target.PortVariable
+        }
+
         # Update the collection
         # Set up request
         $Request.Method = 'PUT'
@@ -587,14 +607,26 @@ try {
 
         <# Verify response value matches input #>
         
-        $CheckUpdateStatus = $Response.Variables | Where-Object { $_.Name -eq $Project.Target.PackageVariable.Name }
-        if ($null -eq $CheckUpdateStatus) {
+        $CheckPackageVariableStatus = $Response.Variables | Where-Object { $_.Name -eq $Project.Target.PackageVariable.Name }
+        if ($null -eq $CheckPackageVariableStatus) {
             Write-Host "Not set.`n"
             Write-Warning ("Variable not set '{0}'`n" -f $Project.Target.PackageVariable.Name)
         }
         else {
-            Write-Host (" [✓] Variable '{0}' updated with value '{1}' ({2})" -f $CheckUpdateStatus.Name, $Project.Target.PackageVariable.Value, $CheckUpdateStatus.Id)
-            $Project.Target.PackageVariable.Id = $CheckUpdateStatus.Id
+            Write-Host (" [✓] Variable '{0}' updated with value '{1}' ({2})" -f $CheckPackageVariableStatus.Name, $Project.Target.PackageVariable.Value, $CheckPackageVariableStatus.Id)
+            $Project.Target.PackageVariable.Id = $CheckPackageVariableStatus.Id
+        }
+
+        if ($null -ne $Project.Target.PortVariable.Value) {
+            $CheckPortVariableStatus = $Response.Variables | Where-Object { $_.Name -eq $Project.Target.PortVariable.Name }
+            if ($null -eq $CheckPortVariableStatus) {
+                Write-Host "Not set.`n"
+                Write-Warning ("Variable not set '{0}'`n" -f $Project.Target.PortVariable.Name)
+            }
+            else {
+                Write-Host (" [✓] Variable '{0}' updated with value '{1}' ({2})" -f $CheckPortVariableStatus.Name, $Project.Target.PortVariable.Value, $CheckPortVariableStatus.Id)
+                $Project.Target.PortVariable.Id = $CheckPortVariableStatus.Id
+            }
         }
     }
     catch {
@@ -605,11 +637,21 @@ try {
     finally {
         if ($null -eq $Project.Target.PackageVariable.Id) {
             Write-Host "Not updated.`n"
-            Write-Warning ("Unable to set project variable {0} - manual update required.'`n" -f $Project.Target.PackageVariable.Name)
+            Write-Warning ("Unable to set project variable {0} - manual update required.`n" -f $Project.Target.PackageVariable.Name)
         }
         else {
-            Write-Host "Updated.`n"
+            Write-Host "Updated. $($Project.Target.PackageVariable.Name)"
             exit 0
+        }
+        if ($null -ne $Project.Target.PortVariable.Value) {
+            if ($null -eq $Project.Target.PortVariable.Id) {
+                Write-Host "Not updated.`n"
+                Write-Warning ("Unable to set project variable {0} - manual update required.`n" -f $Project.Target.PackageVariable.Name)
+            }
+            else {
+                Write-Host "Updated. $($Project.Target.PortVariable.Name)"
+                exit 0
+            }
         }
     }
 }
