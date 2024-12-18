@@ -94,7 +94,7 @@ function CreateStartupScript() {
         [string]$port
     )
     Write-Host '## Creating startup script...'
-    $serverBin = $OctopusParameters['Noetica.ServerBin']
+    $serverBin = $OctopusParameters['Noetica.ServerBinRoot']
     $filename = "$serverBin\Start$targetApi.bat"
     $content = @"
 cd "\Synthesys\NoeticaAPIs\$targetApi"
