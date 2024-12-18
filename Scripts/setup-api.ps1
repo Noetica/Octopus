@@ -94,10 +94,11 @@ function CreateStartupScript() {
         [string]$port
     )
     Write-Host '## Creating startup script...'
-    $serverBin = $OctopusParameters['Noetica.ServerBin']
+    $appRootFragment = $OctopusParameters['Noetica.AppRoot.Fragment']
+    $serverBin = $OctopusParameters['Noetica.ServerBinRoot']
     $filename = "$serverBin\Start$target.bat"
     $content = @"
-cd "\Synthesys\NoeticaAPIs\$target"
+cd "\$appRootFragment\$target"
 start "$target" dotnet $target.dll --urls "http://+:$port"
 "@
     Set-Content -Path $filename -Value $content
