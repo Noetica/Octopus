@@ -47,6 +47,8 @@ function DeployLatestArtifact() {
         Write-Host "## Clearing target directory: '$target'..."    
         $totalToDeleteCount = 0
         $deletedFileCount = 0
+        $errorList = @()  # Initialize an array to collect errors
+
         Get-ChildItem -Path $target -Recurse -Force | 
             Where-Object { $_.FullName -notin ($exclusions | ForEach-Object { Join-Path $target $_ }) } |
                 ForEach-Object {
@@ -57,12 +59,21 @@ function DeployLatestArtifact() {
                         $deletedFileCount++
                     }
                     catch {
+                        # Collect errors instead of exiting
+                        $errorList += "[!] Error deleting: $($_.FullName) - $_"
                         Write-Host "[!] Error deleting: $($_.FullName) - $_"
                     }
                 }
         Write-Host "## Cleared $deletedFileCount of $totalToDeleteCount"
+
+        # After the loop, if there are errors, output them and exit with code 1
+        if ($errorList.Count -gt 0) {
+            Write-Host "## Errors occurred during deletion:"
+            $errorList | ForEach-Object { Write-Host $_ }
+            exit 1
+        }
     }
-    
+
     $totalToCopyCount = 0
     $copiedFileCount = 0
     Write-Host "## Copying files from '$source' to '$target'..."
