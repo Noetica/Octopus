@@ -3,21 +3,52 @@ param (
     [Parameter(Mandatory = $true)] [string]$SourceDir, # Location of the source artifact to be deployed
     [Parameter(Mandatory = $true)] [string]$TargetDir, # Location of the target deployment directory
     [Parameter(Mandatory = $true)] [string]$DefaultPort, # Port mapping for the project
-    [Parameter(Mandatory = $false)] [string[]]$FileExclusions # Files to ignore when deploying
+    [Parameter(Mandatory = $false)] [string[]]$FileExclusions, # Files to ignore when deploying
+    [Parameter(Mandatory = $false)] [string[]]$Output # Specify a custom location for the log output
 )
 
-Write-Host "## Application name: '$AppName'"
-Write-Host "## Deployment source: '$SourceDir'"
-Write-Host "## Deployment target: '$TargetDir'"
-Write-Host "## Default port: '$DefaultPort'"
-if ($null -ne $FileExclusions) { Write-Host "## Exclusions: '$FileExclusions'" }
+<#==================================================#>
 
+# Backup/Restore variables
+$script:backupDir = "$env:TentacleHome" + '\Logs\' + "$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
+# Logging: Use override if specified, or default value
+$script:logFile = if ($null -ne $Output) { $Output } else { "$($script:backupDir).log" }
+
+<#==================================================#>
+
+class Util {
+    # Property for log file path
+    [string]$logFile
+    # Constructor to initialize the log file path
+    Util([string]$logFilePath) {
+        $this.LogFile = $logFilePath
+    }
+    # Log method
+    [void] Log([string]$level, [string]$message) {
+        $timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+        $logItem = "[$timestamp] [$level] $message"
+        # Output to console
+        Write-Host $logItem
+        # Write to log file
+        try {
+            Add-Content -Path $this.LogFile -Value $logItem
+        }
+        catch {
+            Write-Host "Failed to write to log file: $_" -ForegroundColor Red
+        }
+    }
+}
+
+<#==================================================#>
+
+<#
+    Start/Stop application using Services Manager request mechanism
+#>
 function ControlService {
     param (
-        [string]$target,
         [string]$operation
     )
-    Write-Host "## Requesting $AppName state: '$operation'..."
+    $util.Log('Info', "## Requesting $script:appName state: '$operation'...")
     if ([string]::IsNullOrEmpty($target)) {
         New-ItemProperty -Path 'HKLM:\Software\Noetica\Synthesys\Services\ControlPanel' -Name 'Request' -Value "${operation}" 
     }
@@ -35,76 +66,99 @@ function ControlService {
 
 function DeployLatestArtifact() {
     param (
-        [string]$source,
-        [string]$target,
         [string]$exclusions
     )
-    if (-not (Test-Path -Path $target)) {
-        New-Item -ItemType Directory -Path $target
-        Write-Host "Directory created: $target"
+    if (-not (Test-Path -Path $script:targetDir)) {
+        $util.Log('Debug', 'Creating target directory...')
+        New-Item -ItemType Directory -Path $script:targetDir
+        if (Test-Path $script:targetDir) {
+            $util.Log('Debug', "Directory created successfully. ($script:targetDir)")
+        }
+        else {
+            $util.Log('Critical', "Directory not created. ($script:targetDir)")
+            exit 1
+        }
     }
     else {
-        Write-Host "## Clearing target directory: '$target'..."    
+        $util.Log('Debug', 'Clearing deployment target directory...')
         $totalToDeleteCount = 0
         $deletedFileCount = 0
-        $errorList = @()  # Initialize an array to collect errors
+        $errorList = @() # Initialize an array to collect errors
 
-        Get-ChildItem -Path $target -Recurse -Force | 
-            Where-Object { $_.FullName -notin ($exclusions | ForEach-Object { Join-Path $target $_ }) } |
+        Get-ChildItem -Path $script:targetDir -Recurse -Force | 
+            Where-Object { $_.FullName -notin ($exclusions | ForEach-Object { Join-Path $script:targetDir $_ }) } |
                 ForEach-Object {
                     $totalToDeleteCount++
                     try {
                         Remove-Item -Path $_.FullName -Force -Recurse
-                        Write-Host "Deleted: $($_.FullName)"
+                        $util.Log('Debug', "Deleted successfully. ($($_.FullName))")
                         $deletedFileCount++
                     }
                     catch {
                         # Collect errors instead of exiting
-                        $errorList += "[!] Error deleting: $($_.FullName) - $_"
-                        Write-Host "[!] Error deleting: $($_.FullName) - $_"
+                        $errorList += "Not deleted. $($_.FullName) - $_"
+                        $util.Log('Critical', "Not deleted. ($($_.FullName))")
                     }
                 }
-        Write-Host "## Cleared $deletedFileCount of $totalToDeleteCount"
+        $util.Log('Debug', "Cleared $deletedFileCount of $totalToDeleteCount")
 
         # After the loop, if there are errors, output them and exit with code 1
         if ($errorList.Count -gt 0) {
-            Write-Host "## Errors occurred during deletion:"
-            $errorList | ForEach-Object { Write-Host $_ }
+            $util.Log('Debug', 'Error(s) occurred during deletion:')
+            $errorList | ForEach-Object { $util.Log('Critical', $_) }
             exit 1
         }
     }
 
     $totalToCopyCount = 0
     $copiedFileCount = 0
-    Write-Host "## Copying files from '$source' to '$target'..."
-    Get-ChildItem -Path $source -Recurse -File | ForEach-Object {
-        $relativePath = $_.FullName.Substring($source.Length + 1)
-        $destinationPath = Join-Path -Path $target -ChildPath $relativePath
-        $destinationDir = Split-Path -Path $destinationPath -Parent
-        $totalToCopyCount++
-    
-        if (-not (Test-Path -Path $destinationPath)) {
-            if (-not (Test-Path -Path $destinationDir)) {
-                New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
+    $util.Log('Info', 'Deploying latest artifact...')
+    # Copy items from source directory, unless marked as exclusion
+    $itemsToCopy = Get-ChildItem -Path $script:sourceDir -Recurse | Where-Object { $FileExclusions -notcontains $_.Name }
+    foreach ($item in $itemsToCopy) {
+        $relativePath = $item.FullName.Substring($script:sourceDir.Length).TrimStart('\')
+        $destinationPath = Join-Path -Path $script:targetDir -ChildPath $relativePath
+
+        if ($item.PSIsContainer) {
+            # If item is a directory, create it and check it was created
+            $util.Log('Debug', "Creating directory ($($item.Name))...")
+            $util.Log('Debug', "Source: ($($item.FullName))")
+            $util.Log('Debug', "Target: ($($destinationPath))")
+            New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
+            if (Test-Path $destinationPath) {
+                $util.Log('Debug', 'Directory created successfully.')
             }
-            Copy-Item -Path $_.FullName -Destination $destinationPath
-            Write-Host "Copied: $($_.FullName) to $destinationPath"
-            $copiedFileCount++
+            else {
+                $util.Log('Critical', "Directory not created. ($($destinationPath))")
+                exit 1
+            }
         }
         else {
-            Write-Host "[!] File already exists (skipped): $destinationPath"
+            $totalToCopyCount++
+            # If item is a file, copy it and check it was created
+            $util.Log('Info', "Copying ($($item.Name))...")
+            $util.Log('Debug', "Source: ($($item.FullName))")
+            $util.Log('Debug', "Target: ($destinationPath)")
+            Copy-Item -Path $item.FullName -Destination $destinationPath -Force
+            if (Test-Path $destinationPath) {
+                $util.Log('Info', 'Copied successfully.')
+                $copiedFileCount++
+            }
+            else {
+                $util.Log('Critical', "File not copied. ($(item.FullName))")
+                exit 1
+            }
         }
-    
     }
-    Write-Host "## Copied $copiedFileCount of $totalToCopyCount"
+    $util.Log('Debug', "Copied $copiedFileCount of $totalToCopyCount")
 }
 
 function CreateStartupScript() {
     param (
-        [string]$target,
-        [string]$port
+        [string]$target = $script:appName,
+        [string]$port = $script:defaultPort
     )
-    Write-Host '## Creating startup script...'
+    $util.Log('Info', 'Creating startup script...')
     $appRootFragment = $OctopusParameters['Noetica.AppRoot.Fragment']
     $serverBin = $OctopusParameters['Noetica.ServerBinRoot']
     $filename = "$serverBin\Start$target.bat"
@@ -114,14 +168,16 @@ start "$target" dotnet $target.dll --urls "http://+:$port"
 "@
     Set-Content -Path $filename -Value $content
     if (Test-Path -Path $filename) {
-        Write-Host "Created: $filename with content:`n$content"
+        $util.Log('Info', "Created successfully with content:`n$content")
     }
     else {
-        Write-Host "[!] Startup script not created: $filename"
+        $this.Log('Warn', "Script not created. ($($filename))")
     }
 }
 
-ControlService -target $AppName -operation 'Stop'
-DeployLatestArtifact -source $SourceDir -target $TargetDir -exclusions $FileExclusions
-CreateStartupScript -target $AppName -port $DefaultPort
-ControlService -target $AppName -operation 'Start'
+$util = [Util]::new($script:logFile) # Create an instance of the Util class
+ControlService -operation 'Stop'
+DeployLatestArtifact -exclusions $FileExclusions
+CreateStartupScript
+ControlService -operation 'Start'
+Write-Host "Deployment run completed. Full log file can be found at $script:logFile."
