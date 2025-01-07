@@ -1,0 +1,44 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: main
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  project:
+    secrets: inherit
+    uses: Noetica/Actions/.github/workflows/setup.project.yml@main
+    with:
+      display_name:       # Name, e.g. UserManagement         (For Websites, this should match the name used in IIS)
+      octo_project_space: # Space, options: Default, Kamailio (see Octopus for Spaces, or CLI `octopus space list`)
+      octo_project_group: # Group, e.g. Voice Platform        (see Octopus for Groups, or CLI `octopus project-group list -s <Space>`)
+      octo_template_type: # Type, options: API, Website       (see Octopus for Typs,   or CLI `octopus project-group view Templates -s Default`)
+
+  version:
+    secrets: inherit
+    uses: Noetica/Actions/.github/workflows/setup.version.yml@main
+
+  build:
+    needs: [project, version]
+    secrets: inherit
+    uses: Noetica/Actions/.github/workflows/build.node.angular.yml@main
+    with:
+      app_name: ${{ needs.project.outputs.display_name }}
+      app_version: ${{ needs.version.outputs.semver }}
+      assets_path: /assets
+      node_version: lts/fermium # fermium: v14.21.3
+      use_infragistics: true # If this project uses Infragistics packages
+
+  octopus:
+    needs: [project, version, build]
+    secrets: inherit
+    uses: Noetica/Actions/.github/workflows/deploy.octopus.yml@main
+    with:
+      artifact: ${{ needs.build.outputs.artifact }}
+      project: ${{ needs.project.outputs.project_name }}
