@@ -28,7 +28,7 @@ class Util {
         $timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
         $logItem = "[$timestamp] [$level] $message"
         # Output to console
-        Write-Host $logItem
+        Write-Host $message
         # Write to log file
         try {
             Add-Content -Path $this.LogFile -Value $logItem
@@ -48,7 +48,7 @@ function ControlService {
     param (
         [string]$operation
     )
-    $util.Log('Info', "## Requesting $script:appName state: '$operation'...")
+    $util.Log('Info', "Requesting $script:appName state: '$operation'...")
     if ([string]::IsNullOrEmpty($target)) {
         New-ItemProperty -Path 'HKLM:\Software\Noetica\Synthesys\Services\ControlPanel' -Name 'Request' -Value "${operation}" 
     }
