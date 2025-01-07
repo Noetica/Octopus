@@ -1,0 +1,43 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: main
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  project:
+    secrets: inherit
+    uses: Noetica/Actions/.github/workflows/setup.project.yml@main
+    with:
+      display_name:       # Name, e.g. CampaignManager
+      project_path:       # Project, e.g. CampaignManager.sln
+      octo_project_space: # Space, options: Default, Kamailio (see Octopus for Spaces, or CLI `octopus space list`)
+      octo_project_group: # Group, e.g. Campaign Manager      (see Octopus for Groups, or CLI `octopus project-group list -s <Space>`)
+      octo_template_type: # Type, options: API, Website       (see Octopus for Typs,   or CLI `octopus project-group view Templates -s Default`)
+
+  version:
+    secrets: inherit
+    uses: Noetica/Actions/.github/workflows/setup.version.yml@main
+
+  build:
+    needs: [project, version]
+    secrets: inherit
+    uses: Noetica/Actions/.github/workflows/build.msbuild.yml@main
+    with:
+      app_name: ${{ needs.project.outputs.display_name }}
+      app_version: ${{ needs.version.outputs.semver }}
+      project_path: ${{ needs.project.outputs.project_path }}
+
+  octopus:
+    needs: [project, version, build]
+    secrets: inherit
+    uses: Noetica/Actions/.github/workflows/deploy.octopus.yml@main
+    with:
+      artifact: ${{ needs.build.outputs.artifact }}
+      project: ${{ needs.project.outputs.project_name }}
