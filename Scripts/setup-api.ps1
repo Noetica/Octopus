@@ -167,11 +167,13 @@ cd "\$appRootFragment\$target"
 start "$target" dotnet $target.dll --urls "http://+:$port"
 "@
     Set-Content -Path $filename -Value $content
+    $util.Log('Debug', "Target: ($filename)")
+    $util.Log('Debug', "Content:`n$content")
     if (Test-Path -Path $filename) {
-        $util.Log('Info', "Created successfully with content:`n$content")
+        $util.Log('Info', 'Created successfully.')
     }
     else {
-        $this.Log('Warn', "Script not created. ($($filename))")
+        $this.Log('Warn', "Script not created. ($filename)")
     }
 }
 
