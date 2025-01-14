@@ -648,6 +648,10 @@ catch {
     Write-Error $_
 }
 finally {
+    Write-Host "Setting output variables..."
+    echo "TargetProjectId=$($Project.Target.Id)" >> $env:GITHUB_OUTPUT
+    echo "TargetSpaceId=$($Project.Target.Space.Id)" >> $env:GITHUB_OUTPUT
+    Write-Host "Output variables set."
     if ($?) {
         Write-Host "Script successfully ran to completion.`n"
     }
