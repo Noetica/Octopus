@@ -2,7 +2,7 @@ param (
     [Parameter(Mandatory = $true)] [string]$AppName, # Name of the artifact (versionless) or display name, e.g. ReportsAPI
     [Parameter(Mandatory = $true)] [string]$SourceDir, # Location of the source artifact to be deployed
     [Parameter(Mandatory = $true)] [string]$TargetDir, # Location of the target deployment directory
-    [Parameter(Mandatory = $true)] [string]$DefaultPort, # Port mapping for the project
+    [Parameter(Mandatory = $false)] [string]$DefaultPort, # Port mapping for the project
     [Parameter(Mandatory = $false)] [string[]]$FileExclusions, # Files to ignore when deploying
     [Parameter(Mandatory = $false)] [string[]]$Output # Specify a custom location for the log output
 )
@@ -13,6 +13,9 @@ param (
 $script:backupDir = "$env:TentacleHome" + '\Logs\' + "$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
 # Logging: Use override if specified, or default value
 $script:logFile = if ($null -ne $Output) { $Output } else { "$($script:backupDir).log" }
+# Registry paths
+$script:controlPanel = 'HKLM:\SOFTWARE\Noetica\Synthesys\Services\ControlPanel'
+$script:serviceManager = 'HKLM:\SOFTWARE\Noetica\Synthesys\Services\ServicesManager'
 
 <#==================================================#>
 
@@ -41,27 +44,116 @@ class Util {
 
 <#==================================================#>
 
+function ValidateTargets() {
+    param(
+        [Parameter(Mandatory = $true)] [string[]]$targets
+    )
+    $values = Get-ItemProperty -Path $script:serviceManager | ForEach-Object { $_.PSObject.Properties }
+
+    # Wildcard match targets to existing items, e.g. 'board' -> 'DashboardAPI'.
+    $matched = foreach ($target in $targets) {
+        $items = $values | Where-Object { $_.Value -like "*$target*" }
+        foreach ($item in $items) {
+            $props = $item.Value.Split(',')
+            # Check item is in format:
+            # [0] Name, [1] Description, [2] CommandLine, [3] Priority, [4] Status
+            # Only interested in the registry key name, target name, and status
+            if ($props.Count -eq 5) {
+                [PSCustomObject]@{
+                    UUID   = $item.Name
+                    Name   = $props[0]
+                    Status = $props[4]
+                }
+            }
+        }
+    }
+
+    # Filter and sort returned values
+    return $matched | Sort-Object -Property Name -Unique
+}
+
+function SetTargetStatus() {
+    param (
+        [Parameter(Mandatory = $true)] [PSCustomObject[]]$targets
+    )
+
+    $timeoutSeconds = 30
+    $checkInterval = 3
+
+    foreach ($target in $targets) {
+        # Check status first, start operation if applicable
+        # Retry every $checkInterval seconds until maximum of $timeoutSeconds
+        # $checkInterval can be reduced, it will just log the same items multiple times
+        while (-not (VerifyTargetStatus($target))) {
+            $util.Log('Info', ("{0} {1}...`n" -f $operation, $target.Name))
+            $startTime = Get-Date
+            $execute = '{0}:{1}' -f $operation, $target.UUID
+
+            # Wait for the previous request key to be actioned, don't overwrite it
+            while ($((Get-ItemProperty -Path $script:controlPanel).PSObject.Properties.Name -contains 'Request')) {
+                $util.Log('Debug', 'Waiting for previous request to clear...')
+                if ((Get-Date) -gt $startTime.AddSeconds($timeoutSeconds)) {
+                    throw "Timeout exceeded before request key cleared ($timeoutSeconds seconds)."
+                }
+                Start-Sleep -Seconds $checkInterval
+            }
+
+            # Add next request to registry
+            New-ItemProperty -Path "$script:controlPanel" -Name 'Request' -Value "$execute" -Force | Out-Null
+            Start-Sleep -Seconds $checkInterval
+        }
+    }
+}
+
+function VerifyTargetStatus() {
+    param (
+        [Parameter(Mandatory = $true)] [PSCustomObject]$target
+    )
+
+    # Get the item from registry again to check the status
+    $check = Get-ItemProperty -Path $script:serviceManager 
+    | ForEach-Object { $_.PSObject.Properties }
+    | Where-Object { $_.Value -like "$($target.Name)*" }
+
+    # Split the value string, select first and last items (name, status)
+    $util.Log('Info', "Checking target - $($check.Value.Split(',')[0..-1] | ConvertTo-Json -Compress)")
+
+    if ($check) {
+        $status = $check.Value.Split(',')[-1]
+        return ($operation -eq 'Start' -and $status -eq 'Running') -or ($operation -eq 'Stop' -and $status -eq 'Stopped')
+    }
+    return $false
+}
+
 <#
     Start/Stop application using Services Manager request mechanism
 #>
 function ControlService {
     param (
-        [string]$operation
+        [ValidateSet('Start', 'Stop')]
+        [Parameter(Mandatory = $false)] [string]$operation = 'Start', # Default
+        [Parameter(Mandatory = $false)] [string[]]$targets
     )
-    $util.Log('Info', "Requesting $script:appName state: '$operation'...")
-    if ([string]::IsNullOrEmpty($target)) {
-        New-ItemProperty -Path 'HKLM:\Software\Noetica\Synthesys\Services\ControlPanel' -Name 'Request' -Value "${operation}" 
+    $result = $null
+    # If no targets provided, Start/Stop All
+    if ($null -eq $targets) {
+        $execute = '{0}All' -f $operation
+        New-ItemProperty -Path $script:controlPanel -Name 'Request' -Value $execute
     }
     else {
-        $applications = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Noetica\Synthesys\Services\ServicesManager'
-        foreach ($object_properties in $applications.PsObject.Properties) {
-            $matched = $object_properties.Value -Match $target
-            if ($matched) {
-                $name = $object_properties.Name
-                New-ItemProperty -Path 'HKLM:\Software\Noetica\Synthesys\Services\ControlPanel' -Name 'Request' -Value "${operation}:${name}" 
-            }
+        # Validate targets (allows partial targets to be provided, e.g. *board* -> 'DasboardAPI')
+        # This also allows matching on target Description strings
+        # Correct names and current statuses will be returned into $matched
+        $matched = ValidateTargets -targets $targets
+        if ($matched) {
+            SetTargetStatus($matched)
+            $result = ValidateTargets -targets $targets
+        }
+        else {
+            $util.Log('Warn', 'No matching targets found.')
         }
     }
+    $result | Format-Table Status, Name
 }
 
 function DeployLatestArtifact() {
@@ -178,8 +270,8 @@ start "$target" dotnet $target.dll --urls "http://+:$port"
 }
 
 $util = [Util]::new($script:logFile) # Create an instance of the Util class
-ControlService -operation 'Stop'
+ControlService -targets $script:appName -operation 'Stop'
 DeployLatestArtifact -exclusions $FileExclusions
-CreateStartupScript
-ControlService -operation 'Start'
+if (-not [string]::IsNullOrEmpty($DefaultPort)) { CreateStartupScript }
+ControlService -targets $script:appName -operation 'Start'
 Write-Host "Deployment run completed. Full log file can be found at $script:logFile."
