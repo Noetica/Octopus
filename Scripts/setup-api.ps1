@@ -2,7 +2,7 @@ param (
     [Parameter(Mandatory = $true)] [string]$AppName, # Name of the artifact (versionless) or display name, e.g. ReportsAPI
     [Parameter(Mandatory = $true)] [string]$SourceDir, # Location of the source artifact to be deployed
     [Parameter(Mandatory = $true)] [string]$TargetDir, # Location of the target deployment directory
-    [Parameter(Mandatory = $true)] [string]$DefaultPort, # Port mapping for the project
+    [Parameter(Mandatory = $false)] [string]$DefaultPort, # Port mapping for the project
     [Parameter(Mandatory = $false)] [string[]]$FileExclusions, # Files to ignore when deploying
     [Parameter(Mandatory = $false)] [string[]]$Output # Specify a custom location for the log output
 )
@@ -180,6 +180,8 @@ start "$target" dotnet $target.dll --urls "http://+:$port"
 $util = [Util]::new($script:logFile) # Create an instance of the Util class
 ControlService -operation 'Stop'
 DeployLatestArtifact -exclusions $FileExclusions
-CreateStartupScript
+if (-not [string]::IsNullOrEmpty($DefaultPort)) {
+    CreateStartupScript
+}
 ControlService -operation 'Start'
 Write-Host "Deployment run completed. Full log file can be found at $script:logFile."
