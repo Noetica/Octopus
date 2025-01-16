@@ -25,19 +25,19 @@ if ($match.Success) {
     $sectionContent = $match.Value
 
     # Check if the line already exists
-    if ($sectionContent -like "*$newLine*") {
-        Write-Host "[!] Entry already exists (skipped): $newLine"
+    if ($sectionContent -like "*$newServiceLine*") {
+        Write-Host "[!] Entry already exists (skipped): $newServiceLine"
     }
     else {
         # Add a new line entry to the section
         $updatedSection = $sectionContent.TrimEnd() + "`r`n" + $newServiceLine
 
-        # Ensure a single newline before the next section
+        # Ensure a single newServiceLine before the next section
         $updatedSection = $updatedSection.TrimEnd() + "`r`n"
 
         # Replace the section in $fileContent
         Write-Host '## Appending new service entry...'
-        Write-Host "Adding: $newLine"
+        Write-Host "Adding: $newServiceLine"
         $updatedContent = $fileContent -replace [regex]::Escape($sectionContent), $updatedSection
 
         # Clean up excessive empty lines (no more than one empty line between sections)
