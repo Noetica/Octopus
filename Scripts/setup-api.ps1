@@ -111,9 +111,9 @@ function VerifyTargetStatus() {
     )
 
     # Get the item from registry again to check the status
-    $check = Get-ItemProperty -Path $script:serviceManager 
-    | ForEach-Object { $_.PSObject.Properties }
-    | Where-Object { $_.Value -like "$($target.Name)*" }
+    $check = Get-ItemProperty -Path $script:serviceManager |
+        ForEach-Object { $_.PSObject.Properties } |
+            Where-Object { $_.Value -like "$($target.Name)*" }
 
     # Split the value string, select first and last items (name, status)
     $util.Log('Info', "Checking target - $($check.Value.Split(',')[0..-1] | ConvertTo-Json -Compress)")
