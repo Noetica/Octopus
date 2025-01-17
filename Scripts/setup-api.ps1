@@ -279,11 +279,10 @@ function CreateStartupStartupScript() {
     $appRootFragment = $OctopusParameters['Noetica.AppRoot.Fragment']
     $serverBin = $OctopusParameters['Noetica.ServerBinRoot']
     $filename = "$serverBin\Start$target.bat"
-    $commandLine = $ExecutionContext.InvokeCommand.ExpandString($startupScript) -f $target
     $content = @"
 cd "\$appRootFragment\$target"
-$commandline"
-"@
+$startupScript
+"@ -f $target
  
     Set-Content -Path $filename -Value $content
     $util.Log('Debug', "Target: ($filename)")
@@ -300,6 +299,6 @@ $util = [Util]::new($script:logFile) # Create an instance of the Util class
 ControlService -targets $script:appName -operation 'Stop'
 DeployLatestArtifact -exclusions $FileExclusions
 if (-not [string]::IsNullOrEmpty($DefaultPort)) { CreateStartupScript }
-if (-not [string]::IsNullOrEmpty($StartupScript)) { CreateStartupStartupScript}
+if (-not [string]::IsNullOrEmpty($StartupScript)) { CreateStartupStartupScript }
 ControlService -targets $script:appName -operation 'Start'
 Write-Host "Deployment run completed. Full log file can be found at $script:logFile."
