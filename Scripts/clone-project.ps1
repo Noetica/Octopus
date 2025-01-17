@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory = $false)] [string]$ProjectName, # Name of the project, e.g. nub_api_reports
     [Parameter(Mandatory = $false)] [string]$ProjectType, # Type of project, matching a template slug (api,website)
     [Parameter(Mandatory = $false)] [string]$DefaultPort, # Port mapping if the project requires one to be set
+    [Parameter(Mandatory = $false)] [string]$StartupScript, # Startup script if the project requires one to be set
     [Parameter(Mandatory = $false)] [string]$ArtifactName, # Name of the artifact (versionless) or display name, e.g. ReportsAPI
     [Parameter(Mandatory = $false)] [string]$ProjectLifecycle, # Target lifecycle to use (currently from template source)
     [Parameter(Mandatory = $false)] [string]$ProjectDescription, # Project description
@@ -61,6 +62,13 @@ $Project = @{
             Id          = $null
             Name        = 'Port'
             Value       = $DefaultPort
+            Type        = 'String'
+            IsSensitive = $false
+        }
+        StartupScriptVariable    = @{
+            Id          = $null
+            Name        = 'Port'
+            Value       = $StartupScript
             Type        = 'String'
             IsSensitive = $false
         }
@@ -592,6 +600,17 @@ try {
             # Update the value
             $PortVariableToUpdate = $Project.Target.PortVariable
         }
+        # Check to see if the StartupScript variable is required by the project
+        if ($null -ne $Project.Target.StartupScriptVariable.Value) {
+            # Check to see if the StartupScript variable is already present
+            $StartupScriptVariableToUpdate = $Body.Variables | Where-Object { $_.Name -eq $Project.Target.StartupScriptVariable.Name }
+            if ($null -eq $StartupScriptVariableToUpdate) {
+                $Body.Variables += $Project.Target.StartupScriptVariable
+            }
+    
+            # Update the value
+            $StartupScriptVariableToUpdate = $Project.Target.StartupScriptVariable
+        }
 
         # Update the collection
         # Set up request
@@ -628,6 +647,17 @@ try {
                 $Project.Target.PortVariable.Id = $CheckPortVariableStatus.Id
             }
         }
+        if ($null -ne $Project.Target.StartupScriptVariable.Value) {
+            $CheckStartupScriptVariableStatus = $Response.Variables | Where-Object { $_.Name -eq $Project.Target.StartupScriptVariable.Name }
+            if ($null -eq $CheckStartupScriptVariableStatus) {
+                Write-Host "Not set.`n"
+                Write-Warning ("Variable not set '{0}'`n" -f $Project.Target.StartupScriptVariable.Name)
+            }
+            else {
+                Write-Host (" [✓] Variable '{0}' updated with value '{1}' ({2})" -f $CheckStartupScriptVariableStatus.Name, $Project.Target.StartupScriptVariable.Value, $CheckStartupScriptVariableStatus.Id)
+                $Project.Target.StartupScriptVariable.Id = $CheckStartupScriptVariableStatus.Id
+            }
+        }        
     }
     catch {
         Write-Error $_
