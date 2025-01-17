@@ -67,7 +67,7 @@ $Project = @{
         }
         StartupScriptVariable    = @{
             Id          = $null
-            Name        = 'Port'
+            Name        = 'StartupScript'
             Value       = $StartupScript
             Type        = 'String'
             IsSensitive = $false
