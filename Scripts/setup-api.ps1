@@ -3,6 +3,7 @@ param (
     [Parameter(Mandatory = $true)] [string]$SourceDir, # Location of the source artifact to be deployed
     [Parameter(Mandatory = $true)] [string]$TargetDir, # Location of the target deployment directory
     [Parameter(Mandatory = $false)] [string]$DefaultPort, # Port mapping for the project
+    [Parameter(Mandatory = $false)] [string]$StartupScript, # Override startup script for batch file
     [Parameter(Mandatory = $false)] [string[]]$FileExclusions, # Files to ignore when deploying
     [Parameter(Mandatory = $false)] [string[]]$Output # Specify a custom location for the log output
 )
@@ -265,7 +266,33 @@ start "$target" dotnet $target.dll --urls "http://+:$port"
         $util.Log('Info', 'Created successfully.')
     }
     else {
-        $this.Log('Warn', "Script not created. ($filename)")
+        $util.Log('Warn', "Script not created. ($filename)")
+    }
+}
+
+function CreateStartupStartupScript() {
+    param (
+        [string]$target = $script:appName,
+        [string]$startupScript = $script:startupScript
+    )
+    $util.Log('Info', 'Creating startup startup script...')
+    $appRootFragment = $OctopusParameters['Noetica.AppRoot.Fragment']
+    $serverBin = $OctopusParameters['Noetica.ServerBinRoot']
+    $filename = "$serverBin\Start$target.bat"
+	$commandLine = $ExecutionContext.InvokeCommand.ExpandString($startupScript)
+    $content = @"
+cd "\$appRootFragment\$target"
+$commandline"
+"@
+ 
+    Set-Content -Path $filename -Value $content
+    $util.Log('Debug', "Target: ($filename)")
+    $util.Log('Debug', "Content:`n$content")
+    if (Test-Path -Path $filename) {
+        $util.Log('Info', 'Created successfully.')
+    }
+    else {
+        $util.Log('Warn', "Script not created. ($filename)")
     }
 }
 
@@ -273,5 +300,6 @@ $util = [Util]::new($script:logFile) # Create an instance of the Util class
 ControlService -targets $script:appName -operation 'Stop'
 DeployLatestArtifact -exclusions $FileExclusions
 if (-not [string]::IsNullOrEmpty($DefaultPort)) { CreateStartupScript }
+if (-not [string]::IsNullOrEmpty($StartupScript)) { CreateStartupStartupScript}
 ControlService -targets $script:appName -operation 'Start'
 Write-Host "Deployment run completed. Full log file can be found at $script:logFile."
