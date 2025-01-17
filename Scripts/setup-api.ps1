@@ -279,7 +279,7 @@ function CreateStartupStartupScript() {
     $appRootFragment = $OctopusParameters['Noetica.AppRoot.Fragment']
     $serverBin = $OctopusParameters['Noetica.ServerBinRoot']
     $filename = "$serverBin\Start$target.bat"
-	$commandLine = $ExecutionContext.InvokeCommand.ExpandString($startupScript)
+    $commandLine = $ExecutionContext.InvokeCommand.ExpandString($startupScript) -f $target
     $content = @"
 cd "\$appRootFragment\$target"
 $commandline"
