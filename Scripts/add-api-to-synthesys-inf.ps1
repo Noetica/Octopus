@@ -47,7 +47,7 @@ if ($match.Success) {
         # Write changes to the file
         Try {
             Write-Host '## Saving...'
-            Set-Content -Path $synthesysInf -Value $cleanedContent -Force -Encoding UTF8
+            Set-Content -Path $synthesysInf -Value $cleanedContent -Force -Encoding Ansi
             Write-Host "Saved changes to $synthesysInf"
         }
         Catch {
