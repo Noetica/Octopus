@@ -283,7 +283,7 @@ function CreateStartupStartupScript() {
 cd "\$appRootFragment\$target"
 $startupScript
 "@ -f $target
- 
+    $content = $content.Replace("&quot;","`"")
     Set-Content -Path $filename -Value $content
     $util.Log('Debug', "Target: ($filename)")
     $util.Log('Debug', "Content:`n$content")
@@ -298,6 +298,7 @@ $startupScript
 $util = [Util]::new($script:logFile) # Create an instance of the Util class
 ControlService -targets $script:appName -operation 'Stop'
 DeployLatestArtifact -exclusions $FileExclusions
+$util.Log('Debug', "Startup script selection")
 $util.Log('Debug', "DefaultPort: [($DefaultPort)]")
 $util.Log('Debug', "StartupScript: [($StartupScript)]")
 if (-not [string]::IsNullOrEmpty($DefaultPort)) { CreateStartupScript }
