@@ -2,7 +2,7 @@ param (
     [Parameter(Mandatory = $true)] [string]$BaseUrl,
     [Parameter(Mandatory = $true)] [string]$AppLoginPage 
 )
-$Url = "http://" + $BaseUrl + "/" + $AppLoginPage
+$Url = "https://" + $BaseUrl + "/" + $AppLoginPage
 Write-Output "URLto check is $($Url)"
 try {
     $response = Invoke-WebRequest -Uri $Url -Method Head -ErrorAction Stop
