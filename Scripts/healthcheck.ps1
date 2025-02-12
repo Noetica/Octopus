@@ -1,6 +1,6 @@
 param (
-    [string]$BaseUrl = $OctopusParameters["Tenant.Domain"],
-    [string]$AppLoginPage = "campaignmanager"
+    [Parameter(Mandatory = $true)] [string]$BaseUrl,
+    [Parameter(Mandatory = $true)] [string]$AppLoginPage 
 )
 $Url = "http://" + $BaseUrl + "/" + $AppLoginPage
 Write-Output "URLto check is $($Url)"
