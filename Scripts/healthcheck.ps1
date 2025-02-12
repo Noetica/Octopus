@@ -5,7 +5,7 @@ param (
 $Url = "https://" + $BaseUrl + "/" + $AppLoginPage
 Write-Output "URLto check is $($Url)"
 try {
-    $response = Invoke-WebRequest -Uri $Url -Method Head -ErrorAction Stop
+    $response = Invoke-WebRequest -Uri $Url -Method Head -ErrorAction Stop -UseBasicParsing
     if ($response.StatusCode -eq 200) {
         Write-Output "Success: The URL returned a status code 200."
         exit 0  # Indicate success
