@@ -2,8 +2,8 @@ param (
     [string]$BaseUrl = $OctopusParameters["Tenant.Domain"],
     [string]$AppLoginPage = "campaignmanager"
 )
+$Url = "http://" + $BaseUrl + "/" + $AppLoginPage
 Write-Output "URLto check is $($Url)"
-$Url = $BaseUrl + "/" + $AppLoginPage
 try {
     $response = Invoke-WebRequest -Uri $Url -Method Head -ErrorAction Stop
     if ($response.StatusCode -eq 200) {
