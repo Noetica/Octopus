@@ -1,3 +1,10 @@
+#"args": [
+#"-environment", "dev"
+#"-location", "uksouth"
+#"-partner", "noetica" 
+#"-subscriptionId", "NoeticaCloudDev" 
+#"-apiName", "agent"
+#"-apiVersion", "2.0"
 param (
     [Parameter(Mandatory = $true)] [ValidateSet("dev", "uat", "prod")][string]$environment,
     [Parameter(Mandatory = $true)] [ValidateSet("eastus2", "germanywestcentral", "uksouth")][string]$location,
