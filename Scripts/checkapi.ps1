@@ -15,6 +15,11 @@ param (
     [Parameter(Mandatory = $false)] [string]$apiVersion
 )
 
+$getCommand = Get-Command -Name New-AzApiManagementContext -ErrorAction SilentlyContinue
+if ($getCommand -eq $null) {
+    Install-Module -Name Az -AllowClobber -Force
+}
+
 $resourceGroupName = "rg-$($partner)-$($environment)-$($location)"
 if ($tenant -eq "")
 {
