@@ -34,6 +34,7 @@ else {
     $apimServiceName = "apim-$($tenant)-$($partner)-$($environment)-$($location)"    
 }
 
+Write-Output "apimServiceName: $apimServiceName"
 
 $apimContext = New-AzApiManagementContext -ResourceGroupName $resourceGroupName -ServiceName $apimServiceName
 $subscription = Get-AzApiManagementSubscription -Context $apimContext -ProductId "subscribers"
