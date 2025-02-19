@@ -40,7 +40,7 @@ $apimContext = New-AzApiManagementContext -ResourceGroupName $resourceGroupName 
 $subscription = Get-AzApiManagementSubscription -Context $apimContext -ProductId "subscribers"
 $subscriptionKey = Get-AzApiManagementSubscriptionKey -Context $apimContext -SubscriptionId "$($subscription.SubscriptionId)"
 
-if ($tenant -eq "")
+if ($tenant -eq "" -or $partner -eq "noetica")
 {
     $url = "http://apim-$($partner)-$($environment)-$($location).azure-api.net/$($apiName)/noetica/api/$($apiName)/ping"
 }
