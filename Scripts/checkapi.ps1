@@ -26,7 +26,7 @@ if ($getCommand -eq $null) {
 }
 
 $resourceGroupName = "rg-$($partner)-$($environment)-$($location)"
-if ($tenant -eq "")
+if ($tenant -eq "" -or $partner -eq "noetica")
 {
     $apimServiceName = "apim-$($partner)-$($environment)-$($location)"
 }
