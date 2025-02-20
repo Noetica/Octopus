@@ -74,5 +74,6 @@ try {
     }
 } catch {
     Write-Output "Fail: Unable to reach the URL $url. Error: $_"
+    Write-Output "Headers are $headers"
     exit 1  # Indicate failure
 }
