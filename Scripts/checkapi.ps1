@@ -49,7 +49,7 @@ else
     $url = "http://apim-$($tenant)-$($partner)-$($environment)-$($location).azure-api.net/$($apiName)/noetica/api/$($apiName)/ping"<# Action when all if and elseif conditions are false #>
 }
     
-if ($apiVersion -ne $null)
+if ($apiVersion -ne $null -and $apiVersion -ne "")
 {
     $headers = @{
         "Ocp-Apim-Subscription-Key" = $subscriptionKey.PrimaryKey
@@ -63,6 +63,15 @@ else
     }
 }
 
+Write-Output "Attempt to connect to URL $url"
+Write-Output "With Headers:"
+foreach ($key in $headers.Keys)
+{
+    $value = $headers[$key]
+    Write-Output "$key : $value"
+}
+    
+
 try {
     $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
     if ($response.StatusCode -eq 0 -or $response.StatusCode -eq 200) {
@@ -74,11 +83,6 @@ try {
     }
 } catch {
     Write-Output "Fail: Unable to reach the URL $url. Error: $_"
-    Write-Output "Headers:"
-    foreach ($key in $headers.Keys)
-    {
-        Write-Output "$key : $headers[$key]"
-    }
     
     exit 1  # Indicate failure
 }
