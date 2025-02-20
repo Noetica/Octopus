@@ -74,6 +74,11 @@ try {
     }
 } catch {
     Write-Output "Fail: Unable to reach the URL $url. Error: $_"
-    Write-Output "Headers are $headers"
+    Write-Output "Headers:"
+    foreach ($string in $headers)
+    {
+        Write-Output "$string"
+    }
+    
     exit 1  # Indicate failure
 }
