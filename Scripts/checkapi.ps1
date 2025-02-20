@@ -77,7 +77,7 @@ try {
     Write-Output "Headers:"
     foreach ($key in $headers.Keys)
     {
-        Write-Output "$key : $P$headers[$key]"
+        Write-Output "$key : $headers[$key]"
     }
     
     exit 1  # Indicate failure
