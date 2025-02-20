@@ -73,6 +73,6 @@ try {
         exit 1  # Indicate failure
     }
 } catch {
-    Write-Output "Fail: Unable to reach the URL. Error: $_"
+    Write-Output "Fail: Unable to reach the URL $url. Error: $_"
     exit 1  # Indicate failure
 }
