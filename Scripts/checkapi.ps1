@@ -75,9 +75,9 @@ try {
 } catch {
     Write-Output "Fail: Unable to reach the URL $url. Error: $_"
     Write-Output "Headers:"
-    foreach ($string in $headers)
+    foreach ($key in $headers.Keys)
     {
-        Write-Output "$string"
+        Write-Output "$key : $P$headers[$key]"
     }
     
     exit 1  # Indicate failure
