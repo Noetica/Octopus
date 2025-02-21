@@ -41,7 +41,7 @@ $apimContext = New-AzApiManagementContext -ResourceGroupName $resourceGroupName 
 $subscription = Get-AzApiManagementSubscription -Context $apimContext -ProductId "subscribers"
 $subscriptionKey = Get-AzApiManagementSubscriptionKey -Context $apimContext -SubscriptionId "$($subscription.SubscriptionId)"
 
-$url = "http://$($frontdoorUrl)/api/$($apiName)/noetica/api/$($apiName)/ping"
+$url = "$($frontdoorUrl)/api/$($apiName)/noetica/api/$($apiName)/ping"
     
 if ($apiVersion -ne $null -and $apiVersion -ne "")
 {
