@@ -15,7 +15,7 @@ param (
     [Parameter(Mandatory = $false)] [string]$apiVersion
 )
 
-if ($apiName -eq "nub_api_campaignmanager")
+if ($apiName -eq "campaignmanager")
 {
     exit 0
 }
