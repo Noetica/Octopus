@@ -12,7 +12,8 @@ param (
     [Parameter(Mandatory = $true)] [string]$partner,
     [Parameter(Mandatory = $true)] [string]$subscriptionId,
     [Parameter(Mandatory = $true)] [string]$apiName,
-    [Parameter(Mandatory = $false)] [string]$apiVersion
+    [Parameter(Mandatory = $false)] [string]$apiVersion,
+    [Parameter(Mandatory = $true)] [string]$frontdoorUrl
 )
 
 $scriptPath = $PSScriptRoot
@@ -23,12 +24,6 @@ Write-Output "The script is running from: $scriptPath"
 $getCommand = Get-Command -Name New-AzApiManagementContext -ErrorAction SilentlyContinue
 if ($getCommand -eq $null) {
     Install-Module -Name Az -AllowClobber -Force
-
-Write-Output "Checking API [$apiName] in environment $environment, location $location, partner $partner, subscription $subscriptionId"
-
-if ($apiName -eq "campaignmanager")
-{
-    exit 0
 }
 
 $resourceGroupName = "rg-$($partner)-$($environment)-$($location)"
@@ -46,14 +41,7 @@ $apimContext = New-AzApiManagementContext -ResourceGroupName $resourceGroupName 
 $subscription = Get-AzApiManagementSubscription -Context $apimContext -ProductId "subscribers"
 $subscriptionKey = Get-AzApiManagementSubscriptionKey -Context $apimContext -SubscriptionId "$($subscription.SubscriptionId)"
 
-if ($tenant -eq "" -or $partner -eq "noetica")
-{
-    $url = "http://apim-$($partner)-$($environment)-$($location).azure-api.net/$($apiName)/noetica/api/$($apiName)/ping"
-}
-else 
-{
-    $url = "http://apim-$($tenant)-$($partner)-$($environment)-$($location).azure-api.net/$($apiName)/noetica/api/$($apiName)/ping"<# Action when all if and elseif conditions are false #>
-}
+$url = "$($frontdoorUrl)/api/$($apiName)/noetica/api/$($apiName)/ping"
     
 if ($apiVersion -ne $null -and $apiVersion -ne "")
 {
