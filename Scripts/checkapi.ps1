@@ -15,6 +15,8 @@ param (
     [Parameter(Mandatory = $false)] [string]$apiVersion
 )
 
+Write-Output "Checking API [$apiName] in environment $environment, location $location, partner $partner, subscription $subscriptionId"
+
 if ($apiName -eq "campaignmanager")
 {
     exit 0
