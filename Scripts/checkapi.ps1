@@ -15,6 +15,11 @@ param (
     [Parameter(Mandatory = $false)] [string]$apiVersion
 )
 
+if ($apiName -eq "nub_api_campaignmanager")
+{
+    exit 0
+}
+
 $resourceGroupName = "rg-$($partner)-$($environment)-$($location)"
 if ($tenant -eq "")
 {
