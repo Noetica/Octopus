@@ -23,6 +23,7 @@ Write-Output "The script is running from: $scriptPath"
 $getCommand = Get-Command -Name New-AzApiManagementContext -ErrorAction SilentlyContinue
 if ($getCommand -eq $null) {
     Install-Module -Name Az -AllowClobber -Force
+}
 
 Write-Output "Checking API [$apiName] in environment $environment, location $location, partner $partner, subscription $subscriptionId"
 
