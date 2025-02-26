@@ -5,4 +5,12 @@ if ($getCommand -eq $null) {
     Install-Module -Name Az -AllowClobber -Force
 }
 
-Connect-AzAccount -Identity
+if ($debug -ne $null)
+{
+    Connect-AzAccount -Identity
+}
+else {
+    Connect-AzAccount
+}
+
+
