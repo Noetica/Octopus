@@ -58,3 +58,6 @@ if ($match.Success) {
 else {
     Write-Host "[!] Section $sectionName not found"
 }
+
+Update-ServiceConfig
+Start-Service -targets $packageName
