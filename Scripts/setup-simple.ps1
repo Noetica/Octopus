@@ -15,48 +15,23 @@ $script:logFile = if ($null -ne $Output) { $Output } else { "$($script:backupDir
 
 <#==================================================#>
 
-class Util {
-    # Property for log file path
-    [string]$logFile
-    # Constructor to initialize the log file path
-    Util([string]$logFilePath) {
-        $this.LogFile = $logFilePath
-    }
-    # Log method
-    [void] Log([string]$level, [string]$message) {
-        $timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-        $logItem = "[$timestamp] [$level] $message"
-        # Output to console
-        Write-Host $message
-        # Write to log file
-        try {
-            Add-Content -Path $this.LogFile -Value $logItem
-        }
-        catch {
-            Write-Host "Failed to write to log file: $_" -ForegroundColor Red
-        }
-    }
-}
-
-<#==================================================#>
-
 function DeployLatestArtifact() {
     param (
         [string]$exclusions
     )
     if (-not (Test-Path -Path $script:targetDir)) {
-        $util.Log('Debug', 'Creating target directory...')
+        $logger.Log('Debug', 'Creating target directory...')
         New-Item -ItemType Directory -Path $script:targetDir
         if (Test-Path $script:targetDir) {
-            $util.Log('Debug', "Directory created successfully. ($script:targetDir)")
+            $logger.Log('Debug', "Directory created successfully. ($script:targetDir)")
         }
         else {
-            $util.Log('Critical', "Directory not created. ($script:targetDir)")
+            $logger.Log('Critical', "Directory not created. ($script:targetDir)")
             exit 1
         }
     }
     else {
-        $util.Log('Debug', 'Clearing deployment target directory...')
+        $logger.Log('Debug', 'Clearing deployment target directory...')
         $totalToDeleteCount = 0
         $deletedFileCount = 0
         $errorList = @() # Initialize an array to collect errors
@@ -67,28 +42,28 @@ function DeployLatestArtifact() {
                     $totalToDeleteCount++
                     try {
                         Remove-Item -Path $_.FullName -Force -Recurse
-                        $util.Log('Debug', "Deleted successfully. ($($_.FullName))")
+                        $logger.Log('Debug', "Deleted successfully. ($($_.FullName))")
                         $deletedFileCount++
                     }
                     catch {
                         # Collect errors instead of exiting
                         $errorList += "Not deleted. $($_.FullName) - $_"
-                        $util.Log('Critical', "Not deleted. ($($_.FullName))")
+                        $logger.Log('Critical', "Not deleted. ($($_.FullName))")
                     }
                 }
-        $util.Log('Debug', "Cleared $deletedFileCount of $totalToDeleteCount")
+        $logger.Log('Debug', "Cleared $deletedFileCount of $totalToDeleteCount")
 
         # After the loop, if there are errors, output them and exit with code 1
         if ($errorList.Count -gt 0) {
-            $util.Log('Debug', 'Error(s) occurred during deletion:')
-            $errorList | ForEach-Object { $util.Log('Critical', $_) }
+            $logger.Log('Debug', 'Error(s) occurred during deletion:')
+            $errorList | ForEach-Object { $logger.Log('Critical', $_) }
             exit 1
         }
     }
 
     $totalToCopyCount = 0
     $copiedFileCount = 0
-    $util.Log('Info', 'Deploying latest artifact...')
+    $logger.Log('Info', 'Deploying latest artifact...')
     # Copy items from source directory, unless marked as exclusion
     $itemsToCopy = Get-ChildItem -Path $script:sourceDir -Recurse | Where-Object { $FileExclusions -notcontains $_.Name }
     foreach ($item in $itemsToCopy) {
@@ -97,38 +72,39 @@ function DeployLatestArtifact() {
 
         if ($item.PSIsContainer) {
             # If item is a directory, create it and check it was created
-            $util.Log('Debug', "Creating directory ($($item.Name))...")
-            $util.Log('Debug', "Source: ($($item.FullName))")
-            $util.Log('Debug', "Target: ($($destinationPath))")
+            $logger.Log('Debug', "Creating directory ($($item.Name))...")
+            $logger.Log('Debug', "Source: ($($item.FullName))")
+            $logger.Log('Debug', "Target: ($($destinationPath))")
             New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
             if (Test-Path $destinationPath) {
-                $util.Log('Debug', 'Directory created successfully.')
+                $logger.Log('Debug', 'Directory created successfully.')
             }
             else {
-                $util.Log('Critical', "Directory not created. ($($destinationPath))")
+                $logger.Log('Critical', "Directory not created. ($($destinationPath))")
                 exit 1
             }
         }
         else {
             $totalToCopyCount++
             # If item is a file, copy it and check it was created
-            $util.Log('Info', "Copying ($($item.Name))...")
-            $util.Log('Debug', "Source: ($($item.FullName))")
-            $util.Log('Debug', "Target: ($destinationPath)")
+            $logger.Log('Info', "Copying ($($item.Name))...")
+            $logger.Log('Debug', "Source: ($($item.FullName))")
+            $logger.Log('Debug', "Target: ($destinationPath)")
             Copy-Item -Path $item.FullName -Destination $destinationPath -Force
             if (Test-Path $destinationPath) {
-                $util.Log('Info', 'Copied successfully.')
+                $logger.Log('Info', 'Copied successfully.')
                 $copiedFileCount++
             }
             else {
-                $util.Log('Critical', "File not copied. ($(item.FullName))")
+                $logger.Log('Critical', "File not copied. ($(item.FullName))")
                 exit 1
             }
         }
     }
-    $util.Log('Debug', "Copied $copiedFileCount of $totalToCopyCount")
+    $logger.Log('Debug', "Copied $copiedFileCount of $totalToCopyCount")
 }
 
-$util = [Util]::new($script:logFile) # Create an instance of the Util class
+#$util = [Util]::new($script:logFile) # Create an instance of the Util class
+$logger = File-Logger -path $script:logFile # Use the File-Logger Script Module
 DeployLatestArtifact -exclusions $FileExclusions
 Write-Host "Deployment run completed. Full log file can be found at $script:logFile."
