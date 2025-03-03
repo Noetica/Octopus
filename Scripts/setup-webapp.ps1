@@ -28,27 +28,6 @@ $script:logFile = if ($null -ne $Output) { $Output } else { "$($script:backupDir
 <#==================================================#>
 
 class Util {
-    # Property for log file path
-    [string]$logFile
-    # Constructor to initialize the log file path
-    Util([string]$logFilePath) {
-        $this.LogFile = $logFilePath
-    }
-    # Log method
-    [void] Log([string]$level, [string]$message) {
-        $timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-        $logItem = "[$timestamp] [$level] $message"
-        # Output to console
-        Write-Host $message
-        # Write to log file
-        try {
-            Add-Content -Path $this.LogFile -Value $logItem
-        }
-        catch {
-            Write-Host "Failed to write to log file: $_" -ForegroundColor Red
-        }
-    }
-
     <#
         [util] Get relative path of a file in a target directory
         Output the file and the relative path, or null if not found
@@ -90,46 +69,46 @@ class Util {
     Install/Import prerequisite features and modules used by the deployment script
 #>
 function SetupHostPrerequisites() {
-    $util.Log('Info', 'Checking feature requirements...')
+    $logger.Log('Info', 'Checking feature requirements...')
     foreach ($name in $script:requiredFeatures) {
         $feature = Get-WindowsFeature -Name $name
         if ($null -eq $feature) {
-            $util.Log('Critical', "Feature '$name' is not available on this system.")
+            $logger.Log('Critical', "Feature '$name' is not available on this system.")
         }
         elseif ($name.Installed) {
-            $util.Log('Debug', "Feature '$name' is installed.")
+            $logger.Log('Debug', "Feature '$name' is installed.")
         }
         else {
-            $util.Log('Debug', "Feature '$name' is available but not installed. Installing...")
+            $logger.Log('Debug', "Feature '$name' is available but not installed. Installing...")
 
             try {
                 Install-WindowsFeature -Name $name -IncludeManagementTools
-                $util.Log('Debug', "Feature '$name' installed successfully.")
+                $logger.Log('Debug', "Feature '$name' installed successfully.")
             }
             catch {
-                $util.Log('Critical', "Feature '$name' failed to import.")
-                $util.Log('Error', $_)
+                $logger.Log('Critical', "Feature '$name' failed to import.")
+                $logger.Log('Error', $_)
                 exit 1
             }
         }
     }
 
-    $util.Log('Info', 'Checking module requirements...')
+    $logger.Log('Info', 'Checking module requirements...')
     foreach ($name in $script:requiredModules) {
         if (-not (Get-Module -Name $name)) {
-            $util.Log('Debug', "Module '$name' is not imported. Importing...")
+            $logger.Log('Debug', "Module '$name' is not imported. Importing...")
             try {
                 Import-Module $name -ErrorAction Stop
-                $util.Log('Debug', "Module '$name' imported successfully.")
+                $logger.Log('Debug', "Module '$name' imported successfully.")
             }
             catch {
-                $util.Log('Critical', "Module '$name' failed to import.")
-                $util.Log('Error', $_)
+                $logger.Log('Critical', "Module '$name' failed to import.")
+                $logger.Log('Error', $_)
                 exit 1
             }
         }
         else {
-            $util.Log('Debug', "Module '$name' is imported.")
+            $logger.Log('Debug', "Module '$name' is imported.")
         }
     }
 }
@@ -140,7 +119,7 @@ function SetupHostPrerequisites() {
 function ConfigureBackupRestore() {
     $script:backupTargets = New-Object System.Collections.Generic.List[Hashtable]
     foreach ($filename in $BackupFiles) {
-        $util.Log('Debug', "Adding backup/restore target. ($filename)")
+        $logger.Log('Debug', "Adding backup/restore target. ($filename)")
         $script:backupTargets.Add(
             [Hashtable]@{
                 filename     = $filename
@@ -156,11 +135,11 @@ function ConfigureBackupRestore() {
     - Not exists: Create App Pool
 #>
 function CheckAndCreateAppPool() {
-    $util.Log('Info', "Checking '$script:appName' App Pool...")
+    $logger.Log('Info', "Checking '$script:appName' App Pool...")
     # Use Get-IISServerManager to retrieve the Application Pool
     $script:appPool = $script:serverManager.ApplicationPools[$script:appPoolName]
     if ($null -eq $script:appPool) {
-        $util.Log('Warn', 'App Pool missing. Creating...')
+        $logger.Log('Warn', 'App Pool missing. Creating...')
         try {
             # Create a new Application Pool
             $appPool = $script:serverManager.ApplicationPools.Add($script:appPoolName)
@@ -177,7 +156,7 @@ function CheckAndCreateAppPool() {
             # Commit changes
             $script:serverManager.CommitChanges()
 
-            $util.Log('Info', "App Pool created. ($script:appPoolName)")
+            $logger.Log('Info', "App Pool created. ($script:appPoolName)")
             $script:appPool = $script:serverManager.ApplicationPools[$script:appPoolName]
         }
         catch {
@@ -185,13 +164,13 @@ function CheckAndCreateAppPool() {
         }
     }
     else {
-        $util.Log('Info', "App Pool exists. ($script:appPoolName)")
+        $logger.Log('Info', "App Pool exists. ($script:appPoolName)")
     }
     
     if ($null -ne $script:appPool) {
         do {
             if ($script:appPool.State -eq 'Started') {
-                $util.Log('Warn', 'App Pool running. Stopping...')
+                $logger.Log('Warn', 'App Pool running. Stopping...')
                 Stop-WebAppPool -Name $script:appPoolName
         
                 # Wait until the app pool is stopped
@@ -200,25 +179,25 @@ function CheckAndCreateAppPool() {
                     $appPoolState = Get-WebAppPoolState $script:appPoolName
         
                     if ($script:appPool.State -eq 'Stopped') {
-                        $util.Log('Info', 'App Pool stopped.')
+                        $logger.Log('Info', 'App Pool stopped.')
                         break
                     }
                     else {
-                        $util.Log('Debug', "Waiting for App Pool to stop. Current state: $($appPoolState.Value)")
+                        $logger.Log('Debug', "Waiting for App Pool to stop. Current state: $($appPoolState.Value)")
                     }
                 }
         
                 if ($script:retryCount -eq $script:maxRetries) {
-                    $util.Log('Error', "Failed to stop App Pool after $script:maxRetries attempts.")
+                    $logger.Log('Error', "Failed to stop App Pool after $script:maxRetries attempts.")
                 }
                 break
             }
             elseif ($script:appPool.State -eq 'Stopped') {
-                $util.Log('Info', 'App Pool stopped.')
+                $logger.Log('Info', 'App Pool stopped.')
                 break
             }
             else {
-                $util.Log('Debug', "App Pool transitioning. Retry in $script:retryDelay seconds...")
+                $logger.Log('Debug', "App Pool transitioning. Retry in $script:retryDelay seconds...")
                 Start-Sleep -Seconds $script:retryDelay
                 $script:retryCount++
             }
@@ -226,7 +205,7 @@ function CheckAndCreateAppPool() {
         } while ($script:retryCount -lt $script:maxRetries)
         
         if ($script:retryCount -eq $script:maxRetries) {
-            $util.Log('Error', "Failed to transition App Pool out of the transitional state after $script:maxRetries attempts.")
+            $logger.Log('Error', "Failed to transition App Pool out of the transitional state after $script:maxRetries attempts.")
         }
     }
 }
@@ -236,14 +215,14 @@ function CheckAndCreateAppPool() {
     - If exists: Locate and Backup appsettings.json
 #>
 function CheckExistingDeployment() {
-    $util.Log('Info', 'Checking existing deployments...')
+    $logger.Log('Info', 'Checking existing deployments...')
     if (Test-Path $script:targetDir) {
-        $util.Log('Debug', "Checking target path ($script:targetDir)")
+        $logger.Log('Debug', "Checking target path ($script:targetDir)")
         $targetsToRemove = @()
         foreach ($target in $script:backupTargets) {
             $result = $script:util.GetRelativePath($script:targetDir, $target.filename)
             if ($null -ne $result) {
-                $util.Log('Info', "Backing up ($($target.filename))...")
+                $logger.Log('Info', "Backing up ($($target.filename))...")
                 $target.file = $result.file
                 $target.relativePath = $result.relativePath
 
@@ -259,7 +238,7 @@ function CheckExistingDeployment() {
                     $destinationFile = Join-Path -Path $backupPath -ChildPath $target.filename
                     Copy-Item -Path $result.file.FullName -Destination $destinationFile -Force
                     if (Test-Path $destinationFile) {
-                        $util.Log('Info', "Saved successfully. ($destinationFile).")
+                        $logger.Log('Info', "Saved successfully. ($destinationFile).")
                     }
                 }
             }
@@ -269,12 +248,12 @@ function CheckExistingDeployment() {
             }
         }
         foreach ($target in $targetsToRemove) {
-            $util.Log('Debug', "Removing backup/restore target. ($($target.filename))")
+            $logger.Log('Debug', "Removing backup/restore target. ($($target.filename))")
             $script:backupTargets.Remove($target) | Out-Null
         }
     }
     else {
-        $util.Log('Info', 'No deployments found.')
+        $logger.Log('Info', 'No deployments found.')
     }
 }
 
@@ -283,21 +262,21 @@ function CheckExistingDeployment() {
     Transfer files from $script:sourceDir to $script:targetDir
 #>
 function DeployLatestArtifact() {
-    $util.Log('Debug', 'Clearing deployment target directory...')
+    $logger.Log('Debug', 'Clearing deployment target directory...')
     Remove-Item -Recurse -Force $script:targetDir -ErrorAction SilentlyContinue
-    $util.Log('Debug', 'Cleared target directory.')
-    $util.Log('Info', 'Deploying latest artifact...')
+    $logger.Log('Debug', 'Cleared target directory.')
+    $logger.Log('Info', 'Deploying latest artifact...')
     # Extract the filenames from backupTargets where a backup was successful
     $fileBackups = $script:backupTargets | Where-Object { $null -ne $_.file } | ForEach-Object { $_.filename }
     # If target directory doesn't exist, create and check it was created
     if (!(Test-Path $script:targetDir)) {
-        $util.Log('Debug', 'Creating target directory...')
+        $logger.Log('Debug', 'Creating target directory...')
         New-Item -ItemType Directory -Path $script:targetDir -Force | Out-Null
         if (Test-Path $script:targetDir) {
-            $util.Log('Debug', "Directory created successfully. ($($script:targetDir))")
+            $logger.Log('Debug', "Directory created successfully. ($($script:targetDir))")
         }
         else {
-            $util.Log('Critical', "Directory not created. ($($script:targetDir))")
+            $logger.Log('Critical', "Directory not created. ($($script:targetDir))")
             exit 1
         }
     }
@@ -308,31 +287,31 @@ function DeployLatestArtifact() {
         $destinationPath = Join-Path -Path $script:targetDir -ChildPath $relativePath
         if ($item.PSIsContainer) {
             # If item is a directory, create it and check it was created
-            $util.Log('Debug', "Creating directory ($($item.Name))...")
-            $util.Log('Debug', "Source: ($($item.FullName))")
-            $util.Log('Debug', "Target: ($($destinationPath))")
+            $logger.Log('Debug', "Creating directory ($($item.Name))...")
+            $logger.Log('Debug', "Source: ($($item.FullName))")
+            $logger.Log('Debug', "Target: ($($destinationPath))")
             New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
             if (Test-Path $destinationPath) {
-                $util.Log('Debug', "Directory created successfully.")
+                $logger.Log('Debug', "Directory created successfully.")
             } else {
-                $util.Log('Critical', "Directory not created. ($($destinationPath))")
+                $logger.Log('Critical', "Directory not created. ($($destinationPath))")
                 exit 1
             }
         } else {
             # If item is a file, copy it and check it was created
-            $util.Log('Info', "Copying ($($item.Name))...")
-            $util.Log('Debug', "Source: ($($item.FullName))")
-            $util.Log('Debug', "Target: ($destinationPath)")
+            $logger.Log('Info', "Copying ($($item.Name))...")
+            $logger.Log('Debug', "Source: ($($item.FullName))")
+            $logger.Log('Debug', "Target: ($destinationPath)")
             Copy-Item -Path $item.FullName -Destination $destinationPath -Force
             if (Test-Path $destinationPath) {
-                $util.Log('Info', "Copied successfully.")
+                $logger.Log('Info', "Copied successfully.")
             } else {
-                $util.Log('Critical', "File not copied. ($(item.FullName))")
+                $logger.Log('Critical', "File not copied. ($(item.FullName))")
                 exit 1
             }
         }
     }
-    $util.Log('Info', 'Copied files from artifact.')
+    $logger.Log('Info', 'Copied files from artifact.')
 }
 
 <#
@@ -342,16 +321,16 @@ function RestoreBackups() {
     $hasFileBackups = $script:backupTargets | Where-Object { $null -ne $_.file } | ForEach-Object { $true } | Select-Object -First 1
     $hasFileBackups = [bool]$hasFileBackups
     if ($hasFileBackups) {
-        $util.Log('Info', 'Restoring backups...')
+        $logger.Log('Info', 'Restoring backups...')
         foreach ($target in $script:backupTargets) {
             foreach ($path in $target.relativePath) {
-                $util.Log('Info', "Restoring ($($path))...")
+                $logger.Log('Info', "Restoring ($($path))...")
                 $source = "$script:backupDir\$path"
-                $util.Log('Debug', "Backup: ($source)")
+                $logger.Log('Debug', "Backup: ($source)")
                 $target = "$script:targetDir\$path"
                 Copy-Item -Path $source -Destination $target -Force
                 if (Test-Path $target) {
-                    $util.Log('Info', "Restored successfully. ($target).")
+                    $logger.Log('Info', "Restored successfully. ($target).")
                 }
             }
         }
@@ -362,13 +341,13 @@ function RestoreBackups() {
     Set-up the application on the default website, or website specified in $SiteRoot
 #>
 function SetupWebApplication() {
-    $util.Log('Info', 'Checking applications...')
+    $logger.Log('Info', 'Checking applications...')
     $site = $script:serverManager.Sites[$script:siteRoot]
-    $util.Log('Debug', "Located target site. ($script:siteRoot)")
+    $logger.Log('Debug', "Located target site. ($script:siteRoot)")
     
     $existingApp = $site.Applications | Where-Object { $_.Path -eq $script:appPath }
     if ($null -eq $existingApp) {
-        $util.Log('Warn', 'Application missing. Creating...')
+        $logger.Log('Warn', 'Application missing. Creating...')
 
         # Add the new application to the site
         $newApp = $site.Applications.Add($script:appPath, $script:targetDir)
@@ -382,15 +361,15 @@ function SetupWebApplication() {
         # Check the app was created
         $createdApp = $site.Applications | Where-Object { $_.Path -eq $script:appPath }
         if ($null -eq $existingApp) {
-            $util.Log('Info', "Application created. ($($createdApp.Path)).")
+            $logger.Log('Info', "Application created. ($($createdApp.Path)).")
         }
         else {
-            $util.Log('Critical', 'Application not created.')
+            $logger.Log('Critical', 'Application not created.')
             exit 1
         }
     }
     else {
-        $util.Log('Info', "Application already exists. ($($existingApp.Path)).")
+        $logger.Log('Info', "Application already exists. ($($existingApp.Path)).")
     }
 }
 
@@ -398,7 +377,7 @@ function SetupWebApplication() {
     Start the app pool, wait for it to start
 #>
 function StartAppPool() {
-    $util.Log('Info', 'Starting App Pool...')
+    $logger.Log('Info', 'Starting App Pool...')
     do {
         if ($script:appPool.State -eq 'Stopped') {
             Start-WebAppPool -Name $script:appPoolName
@@ -409,38 +388,39 @@ function StartAppPool() {
                 $appPoolState = Get-WebAppPoolState $script:appPoolName
         
                 if ($script:appPool.State -eq 'Started') {
-                    $util.Log('Info', 'App Pool started.')
+                    $logger.Log('Info', 'App Pool started.')
                     break
                 }
                 else {
-                    $util.Log('Debug', "Waiting for App Pool to start. Current state: $($appPoolState.Value)")
+                    $logger.Log('Debug', "Waiting for App Pool to start. Current state: $($appPoolState.Value)")
                 }
             }
         
             if ($script:retryCount -eq $script:maxRetries) {
-                $util.Log('Error', "Failed to start App Pool after $script:maxRetries attempts.")
+                $logger.Log('Error', "Failed to start App Pool after $script:maxRetries attempts.")
             }
             break
         }
         elseif ($script:appPool.State -eq 'Started') {
-            $util.Log('Info', 'App Pool started.')
+            $logger.Log('Info', 'App Pool started.')
             break
         }
         else {
-            $util.Log('Debug', "App Pool transitioning. Retry in $script:retryDelay seconds...")
+            $logger.Log('Debug', "App Pool transitioning. Retry in $script:retryDelay seconds...")
             Start-Sleep -Seconds $script:retryDelay
             $script:retryCount++
         }
     } while ($script:retryCount -lt $script:maxRetries)
         
     if ($script:retryCount -eq $script:maxRetries) {
-        $util.Log('Error', "Failed to transition App Pool out of the transitional state after $script:maxRetries attempts.")
+        $logger.Log('Error', "Failed to transition App Pool out of the transitional state after $script:maxRetries attempts.")
     }
 }
 
 <#==================================================#>
 
-$util = [Util]::new($script:logFile) # Create an instance of the Util class
+#$util = [Util]::new($script:logFile) # Create an instance of the Util class
+$logger = File-Logger -path $script:logFile # Use the File-Logger Script Module
 SetupHostPrerequisites # Check required features and modules are available and install/import
 ConfigureBackupRestore # Set the backup/restore targets for the deployment
 $script:serverManager = Get-IISServerManager # Initialize script-scoped serverManager variable
