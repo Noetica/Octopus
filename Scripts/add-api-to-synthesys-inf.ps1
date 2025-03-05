@@ -1,5 +1,5 @@
-$scriptPath = $PSScriptRoot
-. "$scriptPath\utils\control-service.ps1"
+$script:scriptPath = $PSScriptRoot
+. "$script:scriptPath\utils\control-service.ps1"
 
 
 $targetRoot = $OctopusParameters["Application.Root"];
