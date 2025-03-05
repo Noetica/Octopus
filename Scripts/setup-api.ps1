@@ -8,11 +8,10 @@ param (
     [Parameter(Mandatory = $false)] [string[]]$Output # Specify a custom location for the log output
 )
 
-$scriptPath = $PSScriptRoot
-Write-Output "The script is running from: $scriptPath"
+Write-Output "The script is running from: $PSScriptRoot"
 #Include VM creation functions
-. "$scriptPath\utils\control-service.ps1"
-. "$scriptPath\utils\file-logger.ps1"
+. "$PSScriptRoot\utils\control-service.ps1"
+. "$PSScriptRoot\utils\file-logger.ps1"
 
 
 function DeployLatestArtifact() {
