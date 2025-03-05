@@ -1,5 +1,5 @@
-$scriptPath = $PSScriptRoot
-. "$scriptPath\file-logger.ps1"
+$script:scriptPath = $PSScriptRoot
+. "$script:scriptPath\file-logger.ps1"
 
 $script:controlPanel = 'HKLM:\SOFTWARE\Noetica\Synthesys\Services\ControlPanel'
 $script:serviceManager = 'HKLM:\SOFTWARE\Noetica\Synthesys\Services\ServicesManager'
