@@ -1,4 +1,4 @@
-scriptPath = $PSScriptRoot
+$scriptPath = $PSScriptRoot
 . "$scriptPath\utils\control-service.ps1"
 . "$scriptPath\utils\file-logger.ps1"
 
