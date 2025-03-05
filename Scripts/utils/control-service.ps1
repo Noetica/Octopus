@@ -87,8 +87,8 @@ function Assert-TargetStatus {
         ForEach-Object { $_.PSObject.Properties } |
             Where-Object { $_.Value -like "$($target.Name)*" }
 
-    # Split the value string, select first and last items (name, status)
-    $logger.Log('Info', "Checking target - $($check.Value.Split(',')[0..-1] | ConvertTo-Json -Compress)")
+    # Dump the check
+    $logger.Log('Info', "Checking target - $($check.Value)")
 
     if ($check) {
         $status = $check.Value.Split(',')[-1]
