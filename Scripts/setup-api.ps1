@@ -1,8 +1,3 @@
-$scriptPath = $PSScriptRoot
-Write-Output "The script is running from: $scriptPath"
-#Include VM creation functions
-. "$scriptPath\utils.ps1"
-
 param (
     [Parameter(Mandatory = $true)] [string]$AppName, # Name of the artifact (versionless) or display name, e.g. ReportsAPI
     [Parameter(Mandatory = $true)] [string]$SourceDir, # Location of the source artifact to be deployed
@@ -12,6 +7,11 @@ param (
     [Parameter(Mandatory = $false)] [string[]]$FileExclusions, # Files to ignore when deploying
     [Parameter(Mandatory = $false)] [string[]]$Output # Specify a custom location for the log output
 )
+
+$scriptPath = $PSScriptRoot
+Write-Output "The script is running from: $scriptPath"
+#Include VM creation functions
+. "$scriptPath\utils.ps1"
 
 <#==================================================#>
 
