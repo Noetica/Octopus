@@ -11,7 +11,8 @@ param (
 $scriptPath = $PSScriptRoot
 Write-Output "The script is running from: $scriptPath"
 #Include VM creation functions
-. "$scriptPath\utils.ps1"
+. "$scriptPath\utils\control-service.ps1"
+. "$scriptPath\utils\file-logger.ps1"
 
 <#==================================================#>
 
