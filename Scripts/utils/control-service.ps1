@@ -87,10 +87,9 @@ function Assert-TargetStatus {
         ForEach-Object { $_.PSObject.Properties } |
             Where-Object { $_.Value -like "$($target.Name)*" }
 
-    # Dump the check
-    $logger.Log('Info', "Checking target - $($check.Value)")
-
     if ($check) {
+        # Dump the check
+        $logger.Log('Info', "Checking target - $($check.Value)")
         $status = $check.Value.Split(',')[-1]
         return ($operation -eq 'Start' -and $status -eq 'Running') -or ($operation -eq 'Stop' -and $status -eq 'Stopped')
     }
