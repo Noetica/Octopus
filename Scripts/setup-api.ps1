@@ -155,15 +155,6 @@ $startupScript
     }
 }
 
-# Check if PoShLog module is installed
-if (-not (Get-Module -ListAvailable -Name PoShLog)) {
-    Write-Host "PoShLog module is not installed. Installing now..."
-    Install-Module -Name PoShLog -Force -Scope CurrentUser
-    Write-Host "PoShLog module installed successfully."
-} else {
-    Write-Host "PoShLog module is already installed."
-}
-
 # $util = [Util]::new($script:logFile) # Create an instance of the Util class
 $logger = File-Logger -path $script:logFile # Use the File-Logger Script Module
 Stop-Service -targets $script:appName
