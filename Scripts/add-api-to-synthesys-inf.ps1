@@ -1,6 +1,6 @@
 $scriptPath = $PSScriptRoot
 . "$scriptPath\utils\control-service.ps1"
-. "$scriptPath\utils\file-logger.ps1"
+
 
 $targetRoot = $OctopusParameters["Application.Root"];
 $synthesysInf = $OctopusParameters["Synthesys.Inf"]

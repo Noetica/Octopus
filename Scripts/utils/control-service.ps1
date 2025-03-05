@@ -1,5 +1,9 @@
+$scriptPath = $PSScriptRoot
+. "$scriptPath\utils\file-logger.ps1"
+
 $script:controlPanel = 'HKLM:\SOFTWARE\Noetica\Synthesys\Services\ControlPanel'
 $script:serviceManager = 'HKLM:\SOFTWARE\Noetica\Synthesys\Services\ServicesManager'
+$script:logger = File-Logger 
 
 <#
     -- Usage examples --
@@ -57,13 +61,13 @@ function Update-TargetStatus {
         # Retry every $checkInterval seconds until maximum of $timeoutSeconds
         # $checkInterval can be reduced, it will just log the same items multiple times
         while (-not (Assert-TargetStatus -target $target)) {
-            $logger.Log('Info', ("{0} {1}...`n" -f $operation, $target.Name))
+            $script:logger.Log('Info', ("{0} {1}...`n" -f $operation, $target.Name))
             $startTime = Get-Date
             $execute = '{0}:{1}' -f $operation, $target.UUID
 
             # Wait for the previous request key to be actioned, don't overwrite it
             while ($((Get-ItemProperty -Path $script:controlPanel).PSObject.Properties.Name -contains 'Request')) {
-                $logger.Log('Debug', 'Waiting for previous request to clear...')
+                $script:logger.Log('Debug', 'Waiting for previous request to clear...')
                 if ((Get-Date) -gt $startTime.AddSeconds($timeoutSeconds)) {
                     throw "Timeout exceeded before request key cleared ($timeoutSeconds seconds)."
                 }
@@ -82,14 +86,18 @@ function Assert-TargetStatus {
         [Parameter(Mandatory = $true)] [PSCustomObject]$target
     )
 
+
     # Get the item from registry again to check the status
     $check = Get-ItemProperty -Path $script:serviceManager |
         ForEach-Object { $_.PSObject.Properties } |
             Where-Object { $_.Value -like "$($target.Name)*" }
 
-    if ($check -ne $null) {
+            # Split the value string, select first and last items (name, status)
+    $script:logger.Log('Info', "Checking target - $($check.Value.Split(',')[0..-1] | ConvertTo-Json -Compress)")
+
+    if ($check) {
         # Dump the check
-        $logger.Log('Info', "Checking target - $check")
+        $script:logger.Log('Info', "Checking target - $check")
         $status = $check.Value.Split(',')[-1]
         return ($operation -eq 'Start' -and $status -eq 'Running') -or ($operation -eq 'Stop' -and $status -eq 'Stopped')
     }
@@ -121,7 +129,7 @@ function Use-ControlService {
             $result = Resolve-Targets -targets $targets
         }
         else {
-            $logger.Log('Warn', 'No matching targets found.')
+            $script:logger.Log('Warn', 'No matching targets found.')
         }
     }
     $result | Format-Table Status, Name

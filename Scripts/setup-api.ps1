@@ -14,14 +14,6 @@ Write-Output "The script is running from: $scriptPath"
 . "$scriptPath\utils\control-service.ps1"
 . "$scriptPath\utils\file-logger.ps1"
 
-<#==================================================#>
-
-# Backup/Restore variables
-$script:backupDir = "$env:TentacleHome" + '\Logs\' + "$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
-# Logging: Use override if specified, or default value
-$script:logFile = if ($null -ne $Output) { $Output } else { "$($script:backupDir).log" }
-
-<#==================================================#>
 
 function DeployLatestArtifact() {
     param (
@@ -161,8 +153,7 @@ $startupScript
     }
 }
 
-# $util = [Util]::new($script:logFile) # Create an instance of the Util class
-$logger = File-Logger -path $script:logFile # Use the File-Logger Script Module
+$logger = File-Logger  # Use the File-Logger Script Module
 Stop-Service -targets $script:appName
 DeployLatestArtifact -exclusions $FileExclusions
 $logger.Log('Debug', "Startup script selection")
@@ -170,4 +161,5 @@ $logger.Log('Debug', "DefaultPort: [($DefaultPort)]")
 $logger.Log('Debug', "StartupScript: [($StartupScript)]")
 if (-not [string]::IsNullOrEmpty($DefaultPort)) { CreateStartupScript }
 if (-not [string]::IsNullOrEmpty($StartupScript)) { CreateStartupStartupScript }
-Write-Host "Deployment run completed. Full log file can be found at $script:logFile."
+$logFileLocation = File-Logger-Location
+Write-Host "Deployment run completed. Full log file can be found at $logFileLocation ."
