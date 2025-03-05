@@ -1,11 +1,12 @@
 <#==================================================#>
 
-# Backup/Restore variables
-$script:backupDir = "$env:TentacleHome" + '\Logs\' + "$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
-# Logging: Use override if specified, or default value
-$script:logFile = if ($null -ne $Output) { $Output } else { "$($script:backupDir).log" }
+$timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+$logDir = "$env:TentacleHome\Logs"
+
+$script:logFile = "$logDir\$script:appName`_$timestamp.log"
 
 <#==================================================#>
+
 function File-Logger-Location{
     return $script:logFile
 }

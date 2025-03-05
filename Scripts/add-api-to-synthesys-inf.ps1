@@ -1,6 +1,5 @@
 . "$PSScriptRoot\utils\control-service.ps1"
 
-
 $targetRoot = $OctopusParameters["Application.Root"];
 $synthesysInf = $OctopusParameters["Synthesys.Inf"]
 Write-Host "## Configuration file: '$synthesysInf'"

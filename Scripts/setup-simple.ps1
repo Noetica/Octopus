@@ -2,16 +2,11 @@ param (
     [Parameter(Mandatory = $true)] [string]$AppName, # Name of the artifact (versionless) or display name, e.g. ReportsAPI
     [Parameter(Mandatory = $true)] [string]$SourceDir, # Location of the source artifact to be deployed
     [Parameter(Mandatory = $true)] [string]$TargetDir, # Location of the target deployment directory
-    [Parameter(Mandatory = $false)] [string[]]$FileExclusions, # Files to ignore when deploying
-    [Parameter(Mandatory = $false)] [string[]]$Output # Specify a custom location for the log output
+    [Parameter(Mandatory = $false)] [string[]]$FileExclusions # Files to ignore when deploying
 )
 
-<#==================================================#>
-
-# Backup/Restore variables
-$script:backupDir = "$env:TentacleHome" + '\Logs\' + "$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
-# Logging: Use override if specified, or default value
-$script:logFile = if ($null -ne $Output) { $Output } else { "$($script:backupDir).log" }
+Write-Output "The script is running from: $PSScriptRoot"
+. "$PSScriptRoot\utils\file-logger.ps1"
 
 <#==================================================#>
 
@@ -104,7 +99,7 @@ function DeployLatestArtifact() {
     $logger.Log('Debug', "Copied $copiedFileCount of $totalToCopyCount")
 }
 
-#$util = [Util]::new($script:logFile) # Create an instance of the Util class
-$logger = File-Logger -path $script:logFile # Use the File-Logger Script Module
+$logger = File-Logger  # Use File-Logger util
 DeployLatestArtifact -exclusions $FileExclusions
-Write-Host "Deployment run completed. Full log file can be found at $script:logFile."
+$logFileLocation = File-Logger-Location
+Write-Host "Deployment run completed. Full log file can be found at $logFileLocation."
