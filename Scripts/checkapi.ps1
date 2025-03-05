@@ -15,10 +15,8 @@ param (
     [Parameter(Mandatory = $false)] [string]$apiVersion
 )
 
-$scriptPath = $PSScriptRoot
-Write-Output "The script is running from: $scriptPath"
 #Include VM creation functions
-. "$scriptPath\authenticate.ps1"
+. "$PSScriptRoot\authenticate.ps1"
 
 $getCommand = Get-Command -Name New-AzApiManagementContext -ErrorAction SilentlyContinue
 if ($getCommand -eq $null) {
