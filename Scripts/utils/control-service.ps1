@@ -86,7 +86,6 @@ function Assert-TargetStatus {
         [Parameter(Mandatory = $true)] [PSCustomObject]$target
     )
 
-
     # Get the item from registry again to check the status
     $check = Get-ItemProperty -Path $script:serviceManager |
         ForEach-Object { $_.PSObject.Properties } |

@@ -4,15 +4,14 @@ param (
     [Parameter(Mandatory = $true)] [string]$TargetDir, # Location of the target deployment directory
     [Parameter(Mandatory = $false)] [string]$DefaultPort, # Port mapping for the project
     [Parameter(Mandatory = $false)] [string]$StartupScript, # Override startup script for batch file
-    [Parameter(Mandatory = $false)] [string[]]$FileExclusions, # Files to ignore when deploying
-    [Parameter(Mandatory = $false)] [string[]]$Output # Specify a custom location for the log output
+    [Parameter(Mandatory = $false)] [string[]]$FileExclusions # Files to ignore when deploying
 )
 
 Write-Output "The script is running from: $PSScriptRoot"
-#Include VM creation functions
 . "$PSScriptRoot\utils\control-service.ps1"
 . "$PSScriptRoot\utils\file-logger.ps1"
 
+<#==================================================#>
 
 function DeployLatestArtifact() {
     param (
@@ -152,7 +151,7 @@ $startupScript
     }
 }
 
-$logger = File-Logger  # Use the File-Logger Script Module
+$logger = File-Logger  # Use File-Logger util
 Stop-Service -targets $script:appName
 DeployLatestArtifact -exclusions $FileExclusions
 $logger.Log('Debug', "Startup script selection")
@@ -161,4 +160,4 @@ $logger.Log('Debug', "StartupScript: [($StartupScript)]")
 if (-not [string]::IsNullOrEmpty($DefaultPort)) { CreateStartupScript }
 if (-not [string]::IsNullOrEmpty($StartupScript)) { CreateStartupStartupScript }
 $logFileLocation = File-Logger-Location
-Write-Host "Deployment run completed. Full log file can be found at $logFileLocation ."
+Write-Host "Deployment run completed. Full log file can be found at $logFileLocation."

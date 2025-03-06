@@ -3,9 +3,11 @@ param (
     [Parameter(Mandatory = $true)] [string]$SourceDir, # Location of the source artifact to be deployed
     [Parameter(Mandatory = $false)] [string]$SiteRoot = 'Synthesys_General', # Location of the site deployment
     [Parameter(Mandatory = $true)] [string]$TargetDir, # Location of the target deployment directory
-    [Parameter(Mandatory = $false)] [string[]]$BackupFiles, # Files to preserve when updating existing deployment
-    [Parameter(Mandatory = $false)] [string[]]$Output # Specify a custom location for the log output
+    [Parameter(Mandatory = $false)] [string[]]$BackupFiles # Files to preserve when updating existing deployment
 )
+
+Write-Output "The script is running from: $PSScriptRoot"
+. "$PSScriptRoot\utils\file-logger.ps1"
 
 <#==================================================#>
 
@@ -22,46 +24,6 @@ $script:retryDelay = 5 # seconds
 # Backup/Restore variables
 $script:backupDir = "$env:TentacleHome"+"\Logs\"+"$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
 $script:backupTargets = $null
-# Logging: Use override if specified, or default value
-$script:logFile = if ($null -ne $Output) { $Output } else { "$($script:backupDir).log" }
-
-<#==================================================#>
-
-class Util {
-    <#
-        [util] Get relative path of a file in a target directory
-        Output the file and the relative path, or null if not found
-    #>
-    [hashtable] GetRelativePath([string]$directory, [string]$filename) {
-        $match = @{
-            file         = $null
-            filename     = $filename
-            relativePath = $null
-        }
-        $this.Log('Info', "Searching $directory for $($filename)")
-        $match.file = Get-ChildItem -Path $directory -Recurse -File -Filter $filename -ErrorAction SilentlyContinue
-        if ($match.file) {
-            # Check if the file is nested
-            $match.relativePath = $($match.file.FullName.Substring($directory.Length).TrimStart('\'))
-            if ($match.relativePath.Contains('\')) {
-                $match.relativePath = Split-Path $match.relativePath -Parent
-                $this.Log('Info', "File found. ($($match.relativePath)\$filename)")
-            }
-            else {
-                $this.Log('Info', "File found. ($filename)")
-            }
-        }
-        else {
-            $this.Log('Warn', "File not found. ($($filename))")
-        }
-        if ($match.file) {
-            return $match
-        }
-        else {
-            return $null
-        }
-    }
-}
 
 <#==================================================#>
 
@@ -419,8 +381,7 @@ function StartAppPool() {
 
 <#==================================================#>
 
-#$util = [Util]::new($script:logFile) # Create an instance of the Util class
-$logger = File-Logger -path $script:logFile # Use the File-Logger Script Module
+$logger = File-Logger  # Use File-Logger util
 SetupHostPrerequisites # Check required features and modules are available and install/import
 ConfigureBackupRestore # Set the backup/restore targets for the deployment
 $script:serverManager = Get-IISServerManager # Initialize script-scoped serverManager variable
@@ -430,4 +391,5 @@ DeployLatestArtifact # Copy latest artifact files from source
 RestoreBackups # Restore any files that were backed up during deployment
 SetupWebApplication # Create web application and map paths
 StartAppPool # Start up the app pool
-Write-Host "Deployment run completed. Full log file can be found at $script:logFile."
+$logFileLocation = File-Logger-Location
+Write-Host "Deployment run completed. Full log file can be found at $logFileLocation."
