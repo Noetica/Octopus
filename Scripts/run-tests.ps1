@@ -6,6 +6,7 @@ Param (
 $testPath = $TargetDir + "\" + $AppName + ".Tests"
 
 cd "${$testPath}"
+pwd
 dotnet test --no-build
 
 
