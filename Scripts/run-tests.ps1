@@ -6,7 +6,8 @@ Param (
 $testPath = $TargetDir + "\" + $AppName + ".Tests"
 
 cd "${$testPath}"
-pwd
+$currentPath = Get-Location
+Write-Output "Current file path is: $currentPath"
 dotnet test --no-build
 
 
