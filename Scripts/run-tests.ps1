@@ -4,8 +4,8 @@ Param (
 )
 
 $testPath = $TargetDir + "\" + $AppName + ".Tests"
-
-cd "${$testPath}"
+Write-Output "Changing path to  file path is: $testPath"
+Set-Location -Path $testPath
 $currentPath = Get-Location
 Write-Output "Current file path is: $currentPath"
 dotnet test --no-build
