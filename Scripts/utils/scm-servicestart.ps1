@@ -11,7 +11,12 @@ function Start-Services {
     )
 
     foreach ($service in $Services) {
-        Write-Output "Starting service: $service"
-        net start "$service" 2>$null
+        try {
+            Write-Output "Starting service: $service"
+            net start "$service" 2>$null
+        }
+        catch {
+            Write-Error $_ 
+        }
     }
 }
