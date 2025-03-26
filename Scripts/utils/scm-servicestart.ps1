@@ -16,7 +16,9 @@ function Start-Services {
             net start "$service" 2>$null
         }
         catch {
-            Write-Error $_ 
+            # Don't want to Write-Error to avoid stopping the script.
+            # Instead, Write-Host to display the error message.
+            Write-Host $_ 
         }
     }
 }
