@@ -12,8 +12,13 @@ function Stop-Services {
 
     # Stop services in reverse order.
     for ($i = $Services.Count - 1; $i -ge 0; $i--) {
-        $service = $Services[$i]
-        Write-Output "Stopping service: $service"
-        net stop "$service" 2>$null
+        try {
+            $service = $Services[$i]
+            Write-Output "Stopping service: $service"
+            net stop "$service" 2>$null
+        }
+        catch {
+            Write-Error $_ 
+        }
     }
 }
