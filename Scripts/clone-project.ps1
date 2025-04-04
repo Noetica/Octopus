@@ -46,44 +46,72 @@ $Project = @{
         Type        = $ProjectType
     }
     Target   = @{
-        Id              = $null
-        Name            = $ProjectName
-        Space           = @{ Id = $null; Name = $ProjectSpace; }
-        Group           = @{ Id = $null; Name = $ProjectGroup; }
-        Description     = $ProjectDescription
-        PackageVariable = @{
+        Id                    = $null
+        Name                  = $ProjectName
+        Space                 = @{ Id = $null; Name = $ProjectSpace; }
+        Group                 = @{ Id = $null; Name = $ProjectGroup; }
+        Description           = $ProjectDescription
+        ArtifactVariable      = @{
             Id          = $null
             Name        = 'Artifact'
             Value       = $ArtifactName
             Type        = 'String'
             IsSensitive = $false
         }
-        PortVariable    = @{
+        PortVariable          = @{
             Id          = $null
             Name        = 'Port'
             Value       = $DefaultPort
             Type        = 'String'
             IsSensitive = $false
         }
-        StartupScriptVariable    = @{
+        StartupScriptVariable = @{
             Id          = $null
             Name        = 'StartupScript'
             Value       = $StartupScript
             Type        = 'String'
             IsSensitive = $false
         }
-        VariableSet     = @{
+        VariableSet           = @{
             Id        = $null
             Variables = $null
         }
-        Slug            = $ProjectName.Replace('_', '-')
+        Slug                  = $ProjectName.Replace('_', '-')
     }
 }
 
-$Request = @{
-    Method  = $null
-    Uri     = $null
-    Headers = @{ 'X-Octopus-ApiKey' = $Octopus.ApiKey }
+function Add-Or-Update-Variable {
+    param (
+        [ref]$Variables,
+        [hashtable]$NewVariable
+    )
+
+    $Existing = $Variables.Value | Where-Object { $_.Name -eq $NewVariable.Name }
+    if ($null -ne $Existing) {
+        $Existing.Value = $NewVariable.Value
+        return $Existing.Id
+    }
+    else {
+        $Variables.Value += $NewVariable
+        return $null
+    }
+}
+
+function Invoke-OctopusApi {
+    param (
+        [string]$Method,
+        [string]$Uri,
+        [object]$Body = $null,
+        [switch]$Verbose
+    )
+
+    $headers = @{ 'X-Octopus-ApiKey' = $Octopus.ApiKey }
+    if ($Verbose) {
+        Write-Host $Method $Uri.Replace($Octopus.Uri, '***')
+    }
+    $params = @{ Method = $Method; Uri = $Uri; Headers = $headers }
+    if ($Body) { $params.Body = ($Body | ConvertTo-Json -Depth 10) }
+    return Invoke-RestMethod @params
 }
 
 try {
@@ -545,87 +573,37 @@ try {
     #>
     try {
         <# Get the project variable set id #>
-        # Set up request
-        $Request.Method = 'GET'
-        $Request.Uri = '{0}/api/{1}/projects/all' -f $Octopus.Uri, $Project.Target.Space.Id
 
-        # Output current action (and request uri if verbose)
+        $uriProjects = '{0}/api/{1}/projects/all' -f $Octopus.Uri, $Project.Target.Space.Id
         Write-Host 'Retrieving variable set...'
-        ($VerboseOutput -eq $true) ? (Write-Host $Request.Method $Request.Uri.Replace($Octopus.Uri, '***')) : $null
-
-        # Execute the request
-        $Response = (Invoke-RestMethod @Request) | Where-Object { $_.Name -eq $ProjectName }
+        $Response = Invoke-OctopusApi -Method 'GET' -Uri $uriProjects -Verbose:$VerboseOutput | Where-Object { $_.Name -eq $ProjectName }
         $Project.Target.VariableSet.Id = $Response.VariableSetId
 
         if ($null -eq $Project.Target.VariableSet.Id) {
             Write-Host "Not found.`n"
-
             throw 'Unable to retrieve project variables.'
             exit 1
         }
-        
+
         <# Get the project variables #>
-        # Set up request
-        $Request.Method = 'GET'
-        $Request.Uri = '{0}/api/{1}/variables/{2}' -f $Octopus.Uri, $Project.Target.Space.Id, $Project.Target.VariableSet.Id
 
-        # Output current action (and request uri if verbose)
+        $uriVariables = '{0}/api/{1}/variables/{2}' -f $Octopus.Uri, $Project.Target.Space.Id, $Project.Target.VariableSet.Id
         Write-Host 'Retrieving project variables...'
-        ($VerboseOutput -eq $true) ? (Write-Host $Request.Method $Request.Uri.Replace($Octopus.Uri, '***')) : $null
+        $Body = Invoke-OctopusApi -Method 'GET' -Uri $uriVariables -Verbose:$VerboseOutput
 
-        # Execute the request
-        $Response = Invoke-RestMethod @Request
+        <# Modify the variables(s) #>
 
-        <# Modify the variable #>
-        # Set up request payload (update project variable)
-        $Body = $Response
-        
-        # Check to see if the Package variable is already present
-        $PackageVariableToUpdate = $Body.Variables | Where-Object { $_.Name -eq $Project.Target.PackageVariable.Name }
-        if ($null -eq $PackageVariableToUpdate) {
-            $Body.Variables += $Project.Target.PackageVariable
-        }
-
-        # Update the value
-        $PackageVariableToUpdate = $Project.Target.PackageVariable
-
-        # Check to see if the Port variable is required by the project
-        if ($null -ne $Project.Target.PortVariable.Value) {
-            # Check to see if the Port variable is already present
-            $PortVariableToUpdate = $Body.Variables | Where-Object { $_.Name -eq $Project.Target.PortVariable.Name }
-            if ($null -eq $PortVariableToUpdate) {
-                $Body.Variables += $Project.Target.PortVariable
-            }
-    
-            # Update the value
-            $PortVariableToUpdate = $Project.Target.PortVariable
-        }
-        # Check to see if the StartupScript variable is required by the project
-        if ($null -ne $Project.Target.StartupScriptVariable.Value) {
-            # Check to see if the StartupScript variable is already present
-            $StartupScriptVariableToUpdate = $Body.Variables | Where-Object { $_.Name -eq $Project.Target.StartupScriptVariable.Name }
-            if ($null -eq $StartupScriptVariableToUpdate) {
-                $Body.Variables += $Project.Target.StartupScriptVariable
-            }
-    
-            # Update the value
-            $StartupScriptVariableToUpdate = $Project.Target.StartupScriptVariable
-        }
-
-        # Update the collection
-        # Set up request
-        $Request.Method = 'PUT'
-        $Request.Uri = '{0}/api/{1}/variables/{2}' -f $Octopus.Uri, $Project.Target.Space.Id, $Project.Target.VariableSet.Id
-
-        # Output current action (and request uri if verbose)
+        # Create/Update Artifact variable
+        $Project.Target.PackageVariable.Id = Update-Or-Add-Variable -Variables ([ref]$Body.Variables) -NewVariable $Project.Target.PackageVariable
+        # Create/Update Port variable if provided
+        if ($null -ne $Project.Target.PortVariable.Value) { $Project.Target.PortVariable.Id = Update-Or-Add-Variable -Variables ([ref]$Body.Variables) -NewVariable $Project.Target.PortVariable }
+        # Create/Update StartupScript variable if provided
+        if ($null -ne $Project.Target.StartupScriptVariable.Value) { $Project.Target.StartupScriptVariable.Id = Update-Or-Add-Variable -Variables ([ref]$Body.Variables) -NewVariable $Project.Target.StartupScriptVariable }
         Write-Host 'Updating variables...'
-        ($VerboseOutput -eq $true) ? (Write-Host $Request.Method $Request.Uri.Replace($Octopus.Uri, '***')) : $null
-
-        # Execute the request
-        $Response = Invoke-RestMethod @Request -Body ($Body | ConvertTo-Json -Depth 10)
+        $Response = Invoke-OctopusApi -Method 'PUT' -Uri $uriVariables -Body $Body -Verbose:$VerboseOutput
 
         <# Verify response value matches input #>
-        
+
         $CheckPackageVariableStatus = $Response.Variables | Where-Object { $_.Name -eq $Project.Target.PackageVariable.Name }
         if ($null -eq $CheckPackageVariableStatus) {
             Write-Host "Not set.`n"
@@ -647,6 +625,7 @@ try {
                 $Project.Target.PortVariable.Id = $CheckPortVariableStatus.Id
             }
         }
+
         if ($null -ne $Project.Target.StartupScriptVariable.Value) {
             $CheckStartupScriptVariableStatus = $Response.Variables | Where-Object { $_.Name -eq $Project.Target.StartupScriptVariable.Name }
             if ($null -eq $CheckStartupScriptVariableStatus) {
@@ -657,7 +636,7 @@ try {
                 Write-Host (" [✓] Variable '{0}' updated with value '{1}' ({2})" -f $CheckStartupScriptVariableStatus.Name, $Project.Target.StartupScriptVariable.Value, $CheckStartupScriptVariableStatus.Id)
                 $Project.Target.StartupScriptVariable.Id = $CheckStartupScriptVariableStatus.Id
             }
-        }        
+        }
     }
     catch {
         Write-Error $_
@@ -669,19 +648,20 @@ try {
             Write-Host "Variables not updated, manual check required.`n"
         }
         else {
-            Write-Host "Variables updated."
+            Write-Host 'Variables updated.'
             exit 0
         }
     }
+
 }
 catch {
     Write-Error $_
 }
 finally {
-    Write-Host "Setting output variables..."
+    Write-Host 'Setting output variables...'
     echo "TargetProjectId=$($Project.Target.Id)" >> $env:GITHUB_OUTPUT
     echo "TargetSpaceId=$($Project.Target.Space.Id)" >> $env:GITHUB_OUTPUT
-    Write-Host "Output variables set."
+    Write-Host 'Output variables set.'
     if ($?) {
         Write-Host "Script successfully ran to completion.`n"
     }
