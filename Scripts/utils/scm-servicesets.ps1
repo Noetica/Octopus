@@ -22,7 +22,7 @@ $ServiceSets = @{
     )
     "VoicePlatform" = @(
         "Noetica DSP",
-        "Noetica Voice Platform-EventLogger",
+        # "Noetica Voice Platform-EventLogger", # Disabled on all SaaS platforms
         "Noetica Voice Platform-XChange",
         "Noetica Voice Platform-SwitchInterface",
         "Noetica Voice Platform-ACD",
