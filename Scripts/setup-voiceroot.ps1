@@ -72,8 +72,11 @@ function DeployLatestArtifact() {
     $totalToCopyCount = 0
     $copiedFileCount = 0
     $logger.Log('Info', 'Deploying latest artifact...')
+    $logger.Log('Info', "Source: ($script:sourceDir)")
     # Copy items from source directory, unless marked as exclusion
     $itemsToCopy = Get-ChildItem -Path $script:sourceDir -Recurse | Where-Object { $FileExclusions -notcontains $_.Name }
+    # Log number of items to copy
+    $logger.Log('Info', "Total items to copy: $($itemsToCopy.Count)")
     foreach ($item in $itemsToCopy) {
         $relativePath = $item.FullName.Substring($script:sourceDir.Length).TrimStart('\')
         $destinationPath = Join-Path -Path $script:targetDir -ChildPath $relativePath
