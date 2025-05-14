@@ -6,7 +6,7 @@
 $parentKey = "HKLM:\Software\Noetica\Voice Platform"
 $pattern = "Group*"
 $valueName = "ExtraParameters"
-$newValue = "sipProxy=talkdeskkamailio2"
+$newValue = "sipProxy=sip:talkdeskkamailio2"
 
 $subKeys = Get-ChildItem -Path $parentKey -Name | Where-Object { $_ -like $pattern }
 
