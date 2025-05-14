@@ -23,14 +23,21 @@ foreach ($subKey in $subKeys) {
 
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $action = New-ScheduledTaskAction -Execute 'pwsh.exe' -Argument '-NoProfile -NonInteractive -WindowStyle Hidden -File "C:\install\UpdateSIPdotINI.ps1"'
-$splat = @{
-    TaskName = 'Update NVP sip.ini with local IP'
-    Trigger = $trigger
-    Action = $action
-#    Settings = $settings
-#    Principal = $principal
-#    TaskPath = 'c:\Install'
-	User = 'System'
+$taskName = 'Update NVP sip.ini with local IP'
+
+# Check if the task already exists
+$existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+
+if ($null -eq $existingTask) {
+    $splat = @{
+        TaskName = $taskName
+        Trigger = $trigger
+        Action = $action
+        User = 'System'
+    }
+    Register-ScheduledTask @splat
+    Write-Output "Scheduled task '$taskName' created successfully"
+} else {
+    Write-Output "Scheduled task '$taskName' already exists"
 }
-Register-ScheduledTask @splat
 
