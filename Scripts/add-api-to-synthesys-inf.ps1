@@ -51,6 +51,14 @@ if ($match.Success) {
             Write-Host '## Saving...'
             Set-Content -Path $synthesysInf -Value $cleanedContent -Force -Encoding Ascii
             Write-Host "Saved changes to $synthesysInf"
+            Write-Host "Reloading Services"
+            Try {
+                Reload-Services
+                Write-Host "Reloaded Services"
+            }
+            Catch {
+                Write-Host "[!] Failed to reload services: $_"
+            }
         }
         Catch {
             Write-Host "[!] Failed to write changes to the file: $_"
