@@ -134,6 +134,10 @@ function Use-ControlService {
     $result | Format-Table Status, Name
 }
 
+function Reload-Services {
+    Use-ControlService -operation 'Reload'
+}
+
 function Start-Service {
     param (
         [Parameter(Mandatory = $false)] [string[]]$targets
