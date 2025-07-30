@@ -24,29 +24,39 @@ function Resolve-Targets {
     param(
         [Parameter(Mandatory = $true)] [string[]]$targets
     )
-    $values = Get-ItemProperty -Path $script:serviceManager | ForEach-Object { $_.PSObject.Properties }
 
-    # Wildcard match targets to existing items, e.g. 'board' -> 'DashboardAPI'.
-    $matched = foreach ($target in $targets) {
-        $items = $values | Where-Object { $_.Value -like "*$target*" }
-        foreach ($item in $items) {
-            $props = $item.Value.Split(',')
-            # Check item is in format:
-            # [0] Name, [1] Description, [2] CommandLine, [3] Priority, [4] Status
-            # Only interested in the registry key name, target name, and status
-            if ($props.Count -eq 5) {
-                [PSCustomObject]@{
-                    UUID   = $item.Name
-                    Name   = $props[0]
-                    Status = $props[4]
+    $maxRetries = 20
+    $retryDelayMs = 500
+    $attempt = 0
+    $matched = @()
+
+    do {
+        $values = Get-ItemProperty -Path $script:serviceManager | ForEach-Object { $_.PSObject.Properties }
+
+        $matched = foreach ($target in $targets) {
+            $items = $values | Where-Object { $_.Value -like "*$target*" }
+            foreach ($item in $items) {
+                $props = $item.Value.Split(',')
+                if ($props.Count -eq 5) {
+                    [PSCustomObject]@{
+                        UUID   = $item.Name
+                        Name   = $props[0]
+                        Status = $props[4]
+                    }
                 }
             }
         }
-    }
 
-    # Filter and sort returned values
+        if ($matched.Count -eq 0) {
+            Start-Sleep -Milliseconds $retryDelayMs
+            $attempt++
+        }
+    } while ($matched.Count -eq 0 -and $attempt -lt $maxRetries)
+
     return $matched | Sort-Object -Property Name -Unique
 }
+
+ 
 
 function Update-TargetStatus {
     param (
