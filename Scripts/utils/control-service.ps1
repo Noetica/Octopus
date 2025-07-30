@@ -17,7 +17,7 @@ $script:logger = File-Logger
 
     3. Reload service configuration
     Update-ServiceConfig -OR-
-    Use-ControlService -operation 'Reload'
+    Use-ControlService -operation 'ReloadServices'
 #>
 
 function Resolve-Targets {
