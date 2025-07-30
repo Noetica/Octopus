@@ -17,7 +17,7 @@ $script:logger = File-Logger
 
     3. Reload service configuration
     Update-ServiceConfig -OR-
-    Use-ControlService -operation 'Reload'
+    Use-ControlService -operation 'ReloadServices'
 #>
 
 function Resolve-Targets {
@@ -108,14 +108,18 @@ function Assert-TargetStatus {
 #>
 function Use-ControlService {
     param (
-        [ValidateSet('Start', 'Stop', 'Reload')]
+        [ValidateSet('Start', 'Stop', 'ReloadServices')]
         [Parameter(Mandatory = $false)] [string]$operation = 'Start', # Default
         [Parameter(Mandatory = $false)] [string[]]$targets
     )
     $result = $null
     # If no targets provided, Start/Stop All
     if ($null -eq $targets) {
-        $execute = '{0}All' -f $operation
+        if ($operation -eq 'ReloadServices') {
+            $execute = $operation
+        } else {
+            $execute = '{0}All' -f $operation
+        }
         New-ItemProperty -Path $script:controlPanel -Name 'Request' -Value $execute
     }
     else {
@@ -134,10 +138,6 @@ function Use-ControlService {
     $result | Format-Table Status, Name
 }
 
-function Reload-Services {
-    Use-ControlService -operation 'Reload'
-}
-
 function Start-Service {
     param (
         [Parameter(Mandatory = $false)] [string[]]$targets
@@ -153,5 +153,5 @@ function Stop-Service {
 }
 
 function Update-ServiceConfig {
-    Use-ControlService -operation 'Reload'
+    Use-ControlService -operation 'ReloadServices'
 }
