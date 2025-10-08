@@ -84,8 +84,15 @@ function Update-TargetStatus {
                 Start-Sleep -Seconds $checkInterval
             }
 
-            # Add next request to registry
-            New-ItemProperty -Path "$script:controlPanel" -Name 'Request' -Value "$execute" -Force | Out-Null
+            # Don't add the request if the target is already in the desired state or the state before
+            if (Assert-TargetStatusChanging -target $target) {
+                $script:logger.Log('Info', ("{0} {1} - in changing state." -f $operation, $target.Name))
+            } else {
+                # Add next request to registry
+                New-ItemProperty -Path "$script:controlPanel" -Name 'Request' -Value "$execute" -Force | Out-Null
+                $script:logger.Log('Info', ("Request added: {0}" -f $execute))
+            }
+
             Start-Sleep -Seconds $checkInterval
         }
     }
@@ -109,6 +116,28 @@ function Assert-TargetStatus {
         $script:logger.Log('Info', "Checking target - $check")
         $status = $check.Value.Split(',')[-1]
         return ($operation -eq 'Start' -and $status -eq 'Running') -or ($operation -eq 'Stop' -and $status -eq 'Stopped')
+    }
+    return $false
+}
+
+function Assert-TargetStatusChanging {
+    param (
+        [Parameter(Mandatory = $true)] [PSCustomObject]$target
+    )
+
+    # Get the item from registry again to check the status
+    $check = Get-ItemProperty -Path $script:serviceManager |
+        ForEach-Object { $_.PSObject.Properties } |
+            Where-Object { $_.Value -like "$($target.Name)*" }
+
+            # Split the value string, select first and last items (name, status)
+    $script:logger.Log('Info', "Checking target - $($check.Value.Split(',')[0..-1] | ConvertTo-Json -Compress)")
+
+    if ($check) {
+        # Dump the check
+        $script:logger.Log('Info', "Checking target changing - $check")
+        $status = $check.Value.Split(',')[-1]
+        return ($operation -eq 'Start' -and $status -eq 'Starting') -or ($operation -eq 'Stop' -and $status -eq 'Stopping')
     }
     return $false
 }
