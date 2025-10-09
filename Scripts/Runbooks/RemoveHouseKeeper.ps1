@@ -148,9 +148,9 @@ function IsServiceCommented {
     return $false
 }
 
-# This script edits a specific section in an INF file, replacing occurrences of a specified text with new text.
+# This script comments out a specific line in a section of an INF file that matches the specified text.
 # usage example:
-# Edit-InfSection -FilePath "C:\Drivers\example.inf" -SectionName "Manufacturer" -SearchText "OldValue" -ReplacementText "NewValue"
+# CommentInfLine -FilePath "C:\Drivers\example.inf" -SectionName "Manufacturer" -SearchText "OldValue"
 $isServiceCommented = IsServiceCommented `
     -FilePath "C:\Synthesys\etc\synthesys.inf" `
     -SectionName "System Services" `
