@@ -101,8 +101,9 @@ function CommentInfLine {
     $backupPath = Join-Path $dirName "$baseName.$timestamp.bak"
     Rename-Item -Path $FilePath -NewName $backupPath -Force
 
-    # Save as ANSI (Default encoding on Windows)
-    $modifiedLines | Set-Content -Path $FilePath -Encoding Default
+    # Save as ANSI (Windows-1252 encoding)
+    $ansiEncoding = [System.Text.Encoding]::GetEncoding(1252)
+    [System.IO.File]::WriteAllLines($FilePath, $modifiedLines, $ansiEncoding)
 
     Write-Output "File updated. Backup saved as $backupPath"
 }
