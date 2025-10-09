@@ -88,7 +88,7 @@ function CommentInfLine {
         $modifiedLines += $line
     }
 
-    if( -not $madechange) {
+    if (-not $madechange) {
         Write-Output "No changes made. The specified text was not found or already commented."
         return
     }
