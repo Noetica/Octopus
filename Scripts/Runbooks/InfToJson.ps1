@@ -48,7 +48,7 @@ Get-Content -Path $infPath | ForEach-Object {
             # Scientific notation conversion (integer part only)
             $value = [double]$value
         }
-        elseif ($value -match '^[\[\{].*[\]\}]$') {
+        elseif ($value -match '^\[.*\]$|^\{.*\}$') {
             # Try to parse JSON objects/arrays
             try {
                 $value = $value | ConvertFrom-Json
