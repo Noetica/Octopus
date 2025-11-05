@@ -1,13 +1,13 @@
 # Local testing:
-# $iniPath = [System.IO.Path]::Combine($env:SystemDrive + "\", "Synthesys", "Etc", "Synthesys.inf")
+# $infPath = [System.IO.Path]::Combine($env:SystemDrive + "\", "Synthesys", "Etc", "Synthesys.inf")
 
 # Octopus runner:
-$iniPath = $OctopusParameters["Noetica.Inf"]
+$infPath = $OctopusParameters["Noetica.Inf"]
 
 $result = @{}
 $section = $null
 
-Get-Content -Path $iniPath | ForEach-Object {
+Get-Content -Path $infPath | ForEach-Object {
     $line = $_.Trim()
     
     # Skip empty lines and full-line comments
