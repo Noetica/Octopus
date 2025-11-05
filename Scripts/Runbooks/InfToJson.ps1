@@ -1,0 +1,61 @@
+# Local testing:
+# $iniPath = [System.IO.Path]::Combine($env:SystemDrive + "\", "Synthesys", "Etc", "Synthesys.inf")
+
+# Octopus runner:
+$iniPath = $OctopusParameters["Noetica.Inf"]
+
+$result = @{}
+$section = $null
+
+Get-Content -Path $iniPath | ForEach-Object {
+    $line = $_.Trim()
+    
+    # Skip empty lines and full-line comments
+    if ($line -eq '' -or $line -match '^;') { return }
+    
+    # Section header
+    if ($line -match '^\[(.+)\]$') {
+        $section = $matches[1]
+        $result[$section] = @{}
+    }
+    # Key-value pair
+    elseif ($line -match '^([^=;]+)=(.*)$' -and $section) {
+        $key = $matches[1].Trim()
+        $value = $matches[2].Trim()
+        
+        # Remove inline comments
+        if ($value -match '^([^;]+?)\s*;') {
+            $value = $matches[1].Trim()
+        }
+        
+        # Remove trailing commas
+        $value = $value.TrimEnd(',').Trim()
+        
+        # Type conversion
+        if ($value -match '^(true|false)$') {
+            # Boolean conversion (case-insensitive)
+            $value = $value -eq 'true'
+        }
+        elseif ($value -match '^\d+$') {
+            # Integer conversion (use int64 for large numbers)
+            $value = [int64]$value
+        }
+        elseif ($value -match '^\d+\.\d+$') {
+            # Decimal/float conversion
+            $value = [double]$value
+        }
+        elseif ($value -match '^[\[\{].*[\]\}]$') {
+            # Try to parse JSON objects/arrays
+            try {
+                $value = $value | ConvertFrom-Json
+            }
+            catch {
+                # Keep as string if JSON parsing fails
+            }
+        }
+        
+        $result[$section][$key] = $value
+    }
+}
+
+$result | ConvertTo-Json -Depth 10
