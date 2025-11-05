@@ -32,16 +32,16 @@ Get-Content -Path $iniPath | ForEach-Object {
         $value = $value.TrimEnd(',').Trim()
         
         # Type conversion
-        if ($value -match '^(true|false)$') {
+        if ($value -imatch '^(true|false)$') {
             # Boolean conversion (case-insensitive)
-            $value = $value -eq 'true'
+            $value = $value -ieq 'true'
         }
-        elseif ($value -match '^\d+$') {
-            # Integer conversion (use int64 for large numbers)
+        elseif ($value -match '^-?\d+$' -and $value -notmatch '^0\d+') {
+            # Integer conversion (exclude leading zeros to preserve them as strings)
             $value = [int64]$value
         }
-        elseif ($value -match '^\d+\.\d+$') {
-            # Decimal/float conversion
+        elseif ($value -match '^-?\d+\.?\d*([eE][+-]?\d+)?$' -and $value -match '\.') {
+            # Decimal/float/scientific notation conversion
             $value = [double]$value
         }
         elseif ($value -match '^[\[\{].*[\]\}]$') {
