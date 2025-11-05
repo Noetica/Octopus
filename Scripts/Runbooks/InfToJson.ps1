@@ -39,13 +39,13 @@ Get-Content -Path $infPath | ForEach-Object {
             # Boolean conversion (case-insensitive)
             $value = $value -ieq 'true'
         }
-        elseif ($value -match '^-?\d+$' -and $value -notmatch '^-?0\d+') {
-            # Integer conversion (exclude leading zeros to preserve them as strings)
-            $value = [int64]$value
-        }
-        elseif ($value -match '^-?\d+(\.\d+)?([eE][+-]?\d+)?$') {
-            # Decimal/float/scientific notation conversion (integer or decimal part)
+        # Decimal/float/scientific notation conversion (must have decimal or exponent)
+        elseif ($value -match '^-?\d+\.\d+([eE][+-]?\d+)?$' -or $value -match '^-?\d+([eE][+-]?\d+)$') {
             $value = [double]$value
+        }
+        # Integer conversion (exclude leading zeros and scientific notation)
+        elseif ($value -match '^-?\d+$' -and $value -notmatch '^-?0\d+' -and $value -notmatch '[eE]') {
+            $value = [int64]$value
         }
         elseif ($value -match '^\[.*\]$|^\{.*\}$') {
             # Try to parse JSON objects/arrays
