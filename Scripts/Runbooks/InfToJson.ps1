@@ -4,6 +4,9 @@
 # Octopus runner:
 $infPath = $OctopusParameters["Noetica.Inf"]
 
+if (-not $infPath -or -not (Test-Path $infPath)) {
+    throw "INF file not found at: $infPath"
+}
 $result = @{}
 $section = $null
 
