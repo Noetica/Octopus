@@ -43,12 +43,8 @@ Get-Content -Path $infPath | ForEach-Object {
             # Integer conversion (exclude leading zeros to preserve them as strings)
             $value = [int64]$value
         }
-        elseif ($value -match '^-?\d+\.\d+([eE][+-]?\d+)?$') {
-            # Decimal/float/scientific notation conversion (with decimal point)
-            $value = [double]$value
-        }
-        elseif ($value -match '^-?\d+([eE][+-]?\d+)$') {
-            # Scientific notation conversion (integer part only)
+        elseif ($value -match '^-?\d+(\.\d+)?([eE][+-]?\d+)?$') {
+            # Decimal/float/scientific notation conversion (integer or decimal part)
             $value = [double]$value
         }
         elseif ($value -match '^\[.*\]$|^\{.*\}$') {
