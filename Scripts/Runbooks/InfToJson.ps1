@@ -40,8 +40,12 @@ Get-Content -Path $iniPath | ForEach-Object {
             # Integer conversion (exclude leading zeros to preserve them as strings)
             $value = [int64]$value
         }
-        elseif ($value -match '^-?\d+\.?\d*([eE][+-]?\d+)?$' -and $value -match '\.') {
-            # Decimal/float/scientific notation conversion
+        elseif ($value -match '^-?\d+\.\d+([eE][+-]?\d+)?$') {
+            # Decimal/float/scientific notation conversion (with decimal point)
+            $value = [double]$value
+        }
+        elseif ($value -match '^-?\d+([eE][+-]?\d+)$') {
+            # Scientific notation conversion (integer part only)
             $value = [double]$value
         }
         elseif ($value -match '^[\[\{].*[\]\}]$') {
