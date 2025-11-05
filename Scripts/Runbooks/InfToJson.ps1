@@ -9,6 +9,7 @@ if (-not $infPath -or -not (Test-Path $infPath)) {
 }
 $result = @{}
 $section = $null
+$seenKeys = @{}  # Track keys per section for duplicate detection
 
 Get-Content -Path $infPath | ForEach-Object {
     $line = $_.Trim()
@@ -20,11 +21,23 @@ Get-Content -Path $infPath | ForEach-Object {
     if ($line -match '^\[(.+)\]$') {
         $section = $matches[1]
         $result[$section] = @{}
+        $seenKeys[$section] = @{}
     }
     # Key-value pair
-    elseif ($line -match '^([^=;]+)=(.*)$' -and $section) {
+    elseif ($line -match '^([^=;]+)=(.*)$') {
+        # Check if we have a section defined
+        if (-not $section) {
+            Write-Warning "Key-value pair found before any section header: $line"
+            return
+        }
         $key = $matches[1].Trim()
         $value = $matches[2].Trim()
+        
+        # Check for duplicate keys in the same section
+        if ($seenKeys[$section].ContainsKey($key)) {
+            Write-Warning "Duplicate key '$key' found in section '[$section]'. Previous value will be overwritten."
+        }
+        $seenKeys[$section][$key] = $true
         
         # Remove inline comments
         if ($value -match '^([^;]+?)\s*;') {
@@ -44,7 +57,7 @@ Get-Content -Path $infPath | ForEach-Object {
             $value = [double]$value
         }
         # Integer conversion (exclude leading zeros and scientific notation)
-        elseif ($value -match '^-?\d+$' -and $value -notmatch '^-?0\d+' -and $value -notmatch '[eE]') {
+        elseif ($value -match '^-?\d+$' -and $value -notmatch '^-?0+\d+' -and $value -notmatch '[eE]') {
             $value = [int64]$value
         }
         elseif ($value -match '^\[.*\]$|^\{.*\}$') {
@@ -61,4 +74,7 @@ Get-Content -Path $infPath | ForEach-Object {
     }
 }
 
+# Convert to JSON with depth limit to handle nested structures
+# Note: -Depth 10 limits nesting depth. Deeply nested JSON structures (>10 levels) 
+# in INF values will be truncated. Increase depth if needed for complex structures.
 $result | ConvertTo-Json -Depth 10
