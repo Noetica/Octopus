@@ -36,7 +36,7 @@ Get-Content -Path $iniPath | ForEach-Object {
             # Boolean conversion (case-insensitive)
             $value = $value -ieq 'true'
         }
-        elseif ($value -match '^-?\d+$' -and $value -notmatch '^0\d+') {
+        elseif ($value -match '^-?\d+$' -and $value -notmatch '^-?0\d+') {
             # Integer conversion (exclude leading zeros to preserve them as strings)
             $value = [int64]$value
         }
