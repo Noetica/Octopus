@@ -29,6 +29,9 @@
 .PARAMETER EmptyAsNull
     When enabled, converts empty values (key=) to JSON null instead of empty strings.
 
+.PARAMETER YesNoAsBoolean
+    When enabled, converts Yes/No values to true/false booleans.
+
 .PARAMETER DefaultSection
     Name for the section to use for key-value pairs found before any section header.
     Default: "_global_"
@@ -61,6 +64,10 @@
     .\Convert-InfToJson.ps1 -InfPath "C:\config\app.inf" -EmptyAsNull
     Creates C:\config\app.json with empty values converted to null
 
+.EXAMPLE
+    .\Convert-InfToJson.ps1 -InfPath "C:\config\app.inf" -YesNoAsBoolean
+    Creates C:\config\app.json with Yes/No values converted to true/false
+
 .NOTES
     Author: Enhanced by code review
     Version: 2.1
@@ -89,6 +96,9 @@ param(
 
     [Parameter(Mandatory = $false)]
     [switch]$EmptyAsNull,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$YesNoAsBoolean,
 
     [Parameter(Mandatory = $false)]
     [string]$DefaultSection = '_global_',
@@ -153,6 +163,11 @@ function ConvertTo-TypedValue {
     # Boolean conversion (case-insensitive)
     if ($Value -imatch '^(true|false)$') {
         return ($Value -ieq 'true')
+    }
+
+    # Yes/No conversion (case-insensitive) - only if enabled
+    if ($YesNoAsBoolean -and $Value -imatch '^(yes|no)$') {
+        return ($Value -ieq 'yes')
     }
 
     # Numeric conversions
@@ -291,6 +306,7 @@ Write-Verbose "Strict Mode: $StrictMode"
 Write-Verbose "Type Conversion: $(-not $NoTypeConversion)"
 Write-Verbose "Strip Quotes: $StripQuotes"
 Write-Verbose "Empty As Null: $EmptyAsNull"
+Write-Verbose "Yes/No As Boolean: $YesNoAsBoolean"
 Write-Verbose "Max File Size: $MaxFileSizeMB MB"
 Write-Verbose "Max Sections: $MaxSections"
 
