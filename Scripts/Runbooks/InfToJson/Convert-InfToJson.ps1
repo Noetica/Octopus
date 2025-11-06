@@ -362,6 +362,9 @@ function ConvertTo-JSONC {
         $SectionComments = @{},
 
         [Parameter(Mandatory = $false)]
+        $TrailingComments = @{},
+
+        [Parameter(Mandatory = $false)]
         [int]$Depth = 10,
 
         [Parameter(Mandatory = $false)]
@@ -425,7 +428,7 @@ function ConvertTo-JSONC {
                 $keyIndex++
                 $isLastKey = ($keyIndex -eq $keyCount)
 
-                # Add key-specific comments
+                # Add key-specific leading comments
                 $commentKey = "${sectionKey}.${key}"
                 if ($Comments.ContainsKey($commentKey)) {
                     foreach ($comment in $Comments[$commentKey]) {
@@ -435,8 +438,34 @@ function ConvertTo-JSONC {
 
                 $value = $sectionValue[$key]
                 $valueJson = ConvertTo-JsonValue -Value $value -IndentLevel ($IndentLevel + 2)
-                $comma = if ($isLastKey) { "" } else { "," }
-                $lines += "    $nextIndent`"$key`": $valueJson$comma"
+
+                # Check if there are trailing comments for this key
+                $hasTrailingComments = $TrailingComments.Contains($commentKey)
+
+                # If there are trailing comments, don't add comma to value line
+                # The comma will be added after the last trailing comment
+                if ($hasTrailingComments) {
+                    $lines += "    $nextIndent`"$key`": $valueJson"
+                } else {
+                    $comma = if ($isLastKey) { "" } else { "," }
+                    $lines += "    $nextIndent`"$key`": $valueJson$comma"
+                }
+
+                # Add key-specific trailing comments
+                if ($hasTrailingComments) {
+                    $trailingCommentList = $TrailingComments[$commentKey]
+                    for ($i = 0; $i -lt $trailingCommentList.Count; $i++) {
+                        $comment = $trailingCommentList[$i]
+                        $isLastComment = ($i -eq $trailingCommentList.Count - 1)
+
+                        # Add comma after the last trailing comment if this isn't the last key
+                        if ($isLastComment -and -not $isLastKey) {
+                            $lines += "    $nextIndent// $comment,"
+                        } else {
+                            $lines += "    $nextIndent// $comment"
+                        }
+                    }
+                }
             }
 
             $comma = if ($isLastSection) { "" } else { "," }
@@ -579,9 +608,11 @@ $sectionHasKeyValue = @{}  # Track if section has any key=value pairs
 $lineNumber = 0
 
 # Comment tracking for JSONC output
-$comments = [ordered]@{}  # Comments by section and key
+$comments = [ordered]@{}  # Comments by section and key (leading comments)
+$trailingComments = [ordered]@{}  # Trailing comments after keys
 $pendingComments = @()  # Comments waiting to be associated
 $sectionComments = [ordered]@{}  # Comments for sections
+$lastKey = $null  # Track the last processed key for trailing comments
 
 # Read and process the INF file
 try {
@@ -624,15 +655,22 @@ try {
                 throw "Number of sections exceeds maximum allowed ($MaxSections). Consider increasing -MaxSections parameter."
             }
 
-            # Before opening new section, assign any pending comments to the PREVIOUS section
-            # If this is the first section, pending comments will be assigned to it instead
+            # Before opening new section, assign any pending comments
             if ($PreserveComments -and $pendingComments.Count -gt 0) {
-                if ($section) {
-                    # Assign to previous section
+                if ($section -and $lastKey) {
+                    # Assign to the last key in the previous section (trailing comments)
+                    $commentKey = "${section}.${lastKey}"
+                    if (-not $trailingComments.Contains($commentKey)) {
+                        $trailingComments[$commentKey] = @()
+                    }
+                    $trailingComments[$commentKey] += $pendingComments
+                    Write-Verbose "Assigned $($pendingComments.Count) trailing comment(s) to key [$section].$lastKey"
+                    $pendingComments = @()
+                } elseif ($section) {
+                    # No keys in previous section, assign to section itself
                     if (-not $sectionComments.Contains($section)) {
                         $sectionComments[$section] = @()
                     }
-                    # Append to existing section comments
                     $sectionComments[$section] += $pendingComments
                     Write-Verbose "Assigned $($pendingComments.Count) comment(s) to previous section [$section]"
                     $pendingComments = @()
@@ -656,6 +694,7 @@ try {
             }
 
             $section = $sectionName
+            $lastKey = $null  # Reset last key for new section
             Write-Verbose "Line ${lineNumber}: Found section [$sectionName]"
 
             # Initialize tracking for this section
@@ -721,16 +760,17 @@ try {
             $typeName = if ($null -eq $typedValue) { "Null" } else { $typedValue.GetType().Name }
             Write-Verbose "Line ${lineNumber}: [$section] $key = $rawValue (Type: $typeName)"
 
-            # Store pending comments for this key
+            # Store pending comments for this key (leading comments)
             if ($PreserveComments -and $pendingComments.Count -gt 0) {
                 $commentKey = "${section}.${key}"
                 $comments[$commentKey] = $pendingComments
                 $pendingComments = @()
-                Write-Verbose "Assigned $($comments[$commentKey].Count) comment(s) to key [$section].$key"
+                Write-Verbose "Assigned $($comments[$commentKey].Count) leading comment(s) to key [$section].$key"
             }
 
             $result[$section][$key] = $typedValue
             $sectionHasKeyValue[$section] = $true
+            $lastKey = $key  # Track this key for potential trailing comments
             return
         }
 
@@ -754,14 +794,24 @@ if ($StrictMode -and $script:HasErrors) {
     throw "Processing failed due to errors (StrictMode enabled)"
 }
 
-# Handle any remaining pending comments - assign to last section
+# Handle any remaining pending comments - assign to last key or section
 if ($PreserveComments -and $pendingComments.Count -gt 0 -and $section) {
-    if (-not $sectionComments.Contains($section)) {
-        $sectionComments[$section] = @()
+    if ($lastKey) {
+        # Assign to the last key (trailing comments)
+        $commentKey = "${section}.${lastKey}"
+        if (-not $trailingComments.Contains($commentKey)) {
+            $trailingComments[$commentKey] = @()
+        }
+        $trailingComments[$commentKey] += $pendingComments
+        Write-Verbose "Assigned $($pendingComments.Count) trailing comment(s) to last key [$section].$lastKey"
+    } else {
+        # No keys in section, assign to section itself
+        if (-not $sectionComments.Contains($section)) {
+            $sectionComments[$section] = @()
+        }
+        $sectionComments[$section] += $pendingComments
+        Write-Verbose "Assigned $($pendingComments.Count) trailing comment(s) to section [$section]"
     }
-    # Append to existing section comments
-    $sectionComments[$section] += $pendingComments
-    Write-Verbose "Assigned $($pendingComments.Count) trailing comment(s) to section [$section]"
     $pendingComments = @()
 }
 
@@ -799,7 +849,7 @@ if ($result.Count -gt $MaxSections) {
 if ($PreserveComments) {
     Write-Verbose "Generating JSONC output with preserved comments"
     try {
-        $jsonOutput = ConvertTo-JSONC -Data $result -Comments $comments -SectionComments $sectionComments -Depth $Depth
+        $jsonOutput = ConvertTo-JSONC -Data $result -Comments $comments -SectionComments $sectionComments -TrailingComments $trailingComments -Depth $Depth
     } catch {
         throw "Error converting to JSONC: $_"
     }
