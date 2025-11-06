@@ -32,6 +32,10 @@
 .PARAMETER YesNoAsBoolean
     When enabled, converts Yes/No values to true/false booleans.
 
+.PARAMETER PreserveComments
+    When enabled, preserves comments from INF file as JSONC (JSON with Comments).
+    Output will be .jsonc format with // style comments.
+
 .PARAMETER DefaultSection
     Name for the section to use for key-value pairs found before any section header.
     Default: "_global_"
@@ -72,6 +76,10 @@
     .\Convert-InfToJson.ps1 -InfPath "C:\config\app.inf" -NoTypeConversion
     Creates C:\config\app.json with all values as strings (no type conversion)
 
+.EXAMPLE
+    .\Convert-InfToJson.ps1 -InfPath "C:\config\app.inf" -PreserveComments
+    Creates C:\config\app.jsonc with comments preserved from the INF file
+
 .NOTES
     Author: Enhanced by code review
     Version: 2.1
@@ -103,6 +111,9 @@ param(
 
     [Parameter(Mandatory = $false)]
     [switch]$YesNoAsBoolean,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$PreserveComments,
 
     [Parameter(Mandatory = $false)]
     [string]$DefaultSection = '_global_',
@@ -264,6 +275,167 @@ function Test-DirectoryWritable {
     }
 }
 
+function ConvertTo-JSONC {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Collections.Specialized.OrderedDictionary]$Data,
+
+        [Parameter(Mandatory = $false)]
+        [hashtable]$Comments = @{},
+
+        [Parameter(Mandatory = $false)]
+        [hashtable]$SectionComments = @{},
+
+        [Parameter(Mandatory = $false)]
+        [int]$Depth = 10,
+
+        [Parameter(Mandatory = $false)]
+        [int]$IndentLevel = 0
+    )
+
+    if ($Depth -le 0) {
+        return '"..."'
+    }
+
+    $indent = "  " * $IndentLevel
+    $nextIndent = "  " * ($IndentLevel + 1)
+    $lines = @()
+    $lines += "$indent{"
+
+    $sectionIndex = 0
+    $sectionCount = $Data.Keys.Count
+
+    foreach ($sectionKey in $Data.Keys) {
+        $sectionIndex++
+        $isLastSection = ($sectionIndex -eq $sectionCount)
+
+        # Add section comments
+        if ($SectionComments.ContainsKey($sectionKey)) {
+            foreach ($comment in $SectionComments[$sectionKey]) {
+                $lines += "$nextIndent// $comment"
+            }
+        }
+
+        $sectionValue = $Data[$sectionKey]
+
+        # Handle array sections
+        if ($sectionValue -is [array]) {
+            $lines += "$nextIndent`"$sectionKey`": ["
+            for ($i = 0; $i -lt $sectionValue.Count; $i++) {
+                $item = $sectionValue[$i]
+                $isLast = ($i -eq $sectionValue.Count - 1)
+                $itemJson = ConvertTo-JsonValue -Value $item -IndentLevel ($IndentLevel + 2)
+                $comma = if ($isLast) { "" } else { "," }
+                $lines += "    $nextIndent$itemJson$comma"
+            }
+            $comma = if ($isLastSection) { "" } else { "," }
+            $lines += "$nextIndent]$comma"
+        }
+        # Handle object sections
+        elseif ($sectionValue -is [System.Collections.Specialized.OrderedDictionary] -or $sectionValue -is [hashtable]) {
+            $lines += "$nextIndent`"$sectionKey`": {"
+
+            $keyIndex = 0
+            $keyCount = $sectionValue.Keys.Count
+
+            foreach ($key in $sectionValue.Keys) {
+                $keyIndex++
+                $isLastKey = ($keyIndex -eq $keyCount)
+
+                # Add key-specific comments
+                $commentKey = "${sectionKey}.${key}"
+                if ($Comments.ContainsKey($commentKey)) {
+                    foreach ($comment in $Comments[$commentKey]) {
+                        $lines += "    $nextIndent// $comment"
+                    }
+                }
+
+                $value = $sectionValue[$key]
+                $valueJson = ConvertTo-JsonValue -Value $value -IndentLevel ($IndentLevel + 2)
+                $comma = if ($isLastKey) { "" } else { "," }
+                $lines += "    $nextIndent`"$key`": $valueJson$comma"
+            }
+
+            $comma = if ($isLastSection) { "" } else { "," }
+            $lines += "$nextIndent}$comma"
+        }
+        else {
+            # Primitive value at section level
+            $valueJson = ConvertTo-JsonValue -Value $sectionValue -IndentLevel ($IndentLevel + 1)
+            $comma = if ($isLastSection) { "" } else { "," }
+            $lines += "$nextIndent`"$sectionKey`": $valueJson$comma"
+        }
+    }
+
+    $lines += "$indent}"
+
+    return ($lines -join "`n")
+}
+
+function ConvertTo-JsonValue {
+    param(
+        [Parameter(Mandatory = $false)]
+        $Value,
+
+        [Parameter(Mandatory = $false)]
+        [int]$IndentLevel = 0
+    )
+
+    if ($null -eq $Value) {
+        return "null"
+    }
+
+    $type = $Value.GetType().Name
+
+    switch ($type) {
+        "Boolean" {
+            return $Value.ToString().ToLower()
+        }
+        "Int32" { return $Value.ToString() }
+        "Int64" { return $Value.ToString() }
+        "Double" { return $Value.ToString() }
+        "Single" { return $Value.ToString() }
+        "String" {
+            # Escape special characters for JSON
+            $escaped = $Value -replace '\\', '\\' -replace '"', '\"' -replace "`n", '\n' -replace "`r", '\r' -replace "`t", '\t'
+            return "`"$escaped`""
+        }
+        "Object[]" {
+            $indent = "  " * $IndentLevel
+            $nextIndent = "  " * ($IndentLevel + 1)
+            $items = @()
+            foreach ($item in $Value) {
+                $itemJson = ConvertTo-JsonValue -Value $item -IndentLevel ($IndentLevel + 1)
+                $items += "$nextIndent$itemJson"
+            }
+            if ($items.Count -gt 0) {
+                return "[`n$($items -join ",`n")`n$indent]"
+            } else {
+                return "[]"
+            }
+        }
+        "ArrayList" {
+            $indent = "  " * $IndentLevel
+            $nextIndent = "  " * ($IndentLevel + 1)
+            $items = @()
+            foreach ($item in $Value) {
+                $itemJson = ConvertTo-JsonValue -Value $item -IndentLevel ($IndentLevel + 1)
+                $items += "$nextIndent$itemJson"
+            }
+            if ($items.Count -gt 0) {
+                return "[`n$($items -join ",`n")`n$indent]"
+            } else {
+                return "[]"
+            }
+        }
+        default {
+            # Try to convert as string
+            $escaped = $Value.ToString() -replace '\\', '\\' -replace '"', '\"' -replace "`n", '\n' -replace "`r", '\r' -replace "`t", '\t'
+            return "`"$escaped`""
+        }
+    }
+}
+
 # Determine INF file path
 if (-not $InfPath) {
     # Try to get from Octopus variable
@@ -311,6 +483,7 @@ Write-Verbose "Type Conversion: $(-not $NoTypeConversion)"
 Write-Verbose "Strip Quotes: $StripQuotes"
 Write-Verbose "Empty As Null: $EmptyAsNull"
 Write-Verbose "Yes/No As Boolean: $YesNoAsBoolean"
+Write-Verbose "Preserve Comments: $PreserveComments"
 Write-Verbose "Max File Size: $MaxFileSizeMB MB"
 Write-Verbose "Max Sections: $MaxSections"
 
@@ -322,15 +495,30 @@ $sectionArrayItems = [ordered]@{}  # Track array items for non-standard sections
 $sectionHasKeyValue = @{}  # Track if section has any key=value pairs
 $lineNumber = 0
 
+# Comment tracking for JSONC output
+$comments = [ordered]@{}  # Comments by section and key
+$pendingComments = @()  # Comments waiting to be associated
+$sectionComments = [ordered]@{}  # Comments for sections
+
 # Read and process the INF file
 try {
     Get-Content -LiteralPath $InfPath -Encoding $Encoding -ErrorAction Stop | ForEach-Object {
         $lineNumber++
         $line = $_.Trim()
 
-        # Skip empty lines and full-line comments
-        # Support ;, #, and // style comments
-        if ($line -eq '' -or $line -match '^[;#]' -or $line -match '^//') {
+        # Handle empty lines
+        if ($line -eq '') {
+            return
+        }
+
+        # Handle full-line comments - capture if PreserveComments enabled
+        if ($line -match '^[;#]' -or $line -match '^//') {
+            if ($PreserveComments) {
+                # Remove comment prefix and store
+                $commentText = $line -replace '^[;#]\s*', '' -replace '^//\s*', ''
+                $pendingComments += $commentText
+                Write-Verbose "Line ${lineNumber}: Captured comment: $commentText"
+            }
             return
         }
 
@@ -360,6 +548,13 @@ try {
 
             $section = $sectionName
             Write-Verbose "Line ${lineNumber}: Found section [$sectionName]"
+
+            # Store pending comments for this section
+            if ($PreserveComments -and $pendingComments.Count -gt 0) {
+                $sectionComments[$sectionName] = $pendingComments
+                $pendingComments = @()
+                Write-Verbose "Assigned $($sectionComments[$sectionName].Count) comment(s) to section [$sectionName]"
+            }
 
             # Initialize tracking for this section
             if (-not $sectionArrayItems.Contains($sectionName)) {
@@ -424,6 +619,14 @@ try {
             $typeName = if ($null -eq $typedValue) { "Null" } else { $typedValue.GetType().Name }
             Write-Verbose "Line ${lineNumber}: [$section] $key = $rawValue (Type: $typeName)"
 
+            # Store pending comments for this key
+            if ($PreserveComments -and $pendingComments.Count -gt 0) {
+                $commentKey = "${section}.${key}"
+                $comments[$commentKey] = $pendingComments
+                $pendingComments = @()
+                Write-Verbose "Assigned $($comments[$commentKey].Count) comment(s) to key [$section].$key"
+            }
+
             $result[$section][$key] = $typedValue
             $sectionHasKeyValue[$section] = $true
             return
@@ -455,7 +658,7 @@ foreach ($sectionName in @($sectionArrayItems.Keys)) {
     if ($sectionArrayItems[$sectionName].Count -gt 0) {
         # If section has NO key=value pairs, make it a pure array
         if (-not $sectionHasKeyValue[$sectionName]) {
-            $result[$sectionName] = $sectionArrayItems[$sectionName]
+            $result[$sectionName] = @($sectionArrayItems[$sectionName])
             Write-Verbose "Section [$sectionName] converted to array with $($sectionArrayItems[$sectionName].Count) items"
         }
         # If section has BOTH key=value pairs and array items, add as _items property
@@ -479,23 +682,34 @@ if ($result.Count -gt $MaxSections) {
     throw "Number of sections ($($result.Count)) exceeds maximum allowed ($MaxSections)"
 }
 
-# Convert to JSON
-try {
-    $jsonOutput = $result | ConvertTo-Json -Depth $Depth -Compress:$false
-
-    # Check if JSON might be truncated due to depth limit
-    if ($jsonOutput -match 'System\.Collections' -or ($Depth -lt 5 -and $result.Count -gt 10)) {
-        Write-Warning "JSON output may be truncated due to depth limit. Consider increasing -Depth parameter (current: $Depth)"
+# Convert to JSON or JSONC
+if ($PreserveComments) {
+    Write-Verbose "Generating JSONC output with preserved comments"
+    try {
+        $jsonOutput = ConvertTo-JSONC -Data $result -Comments $comments -SectionComments $sectionComments -Depth $Depth
+    } catch {
+        throw "Error converting to JSONC: $_"
     }
-} catch {
-    throw "Error converting to JSON: $_"
+} else {
+    Write-Verbose "Generating standard JSON output"
+    try {
+        $jsonOutput = $result | ConvertTo-Json -Depth $Depth -Compress:$false
+
+        # Check if JSON might be truncated due to depth limit
+        if ($jsonOutput -match 'System\.Collections' -or ($Depth -lt 5 -and $result.Count -gt 10)) {
+            Write-Warning "JSON output may be truncated due to depth limit. Consider increasing -Depth parameter (current: $Depth)"
+        }
+    } catch {
+        throw "Error converting to JSON: $_"
+    }
 }
 
 # Determine output file path
 if (-not $OutputPath) {
-    # Generate output path from input path (same location, .json extension)
+    # Generate output path from input path (same location, .json or .jsonc extension)
     $infFileInfo = Get-Item -LiteralPath $InfPath
-    $outputFileName = [System.IO.Path]::GetFileNameWithoutExtension($infFileInfo.Name) + ".json"
+    $extension = if ($PreserveComments) { ".jsonc" } else { ".json" }
+    $outputFileName = [System.IO.Path]::GetFileNameWithoutExtension($infFileInfo.Name) + $extension
     $OutputPath = Join-Path $infFileInfo.DirectoryName $outputFileName
     Write-Verbose "Output path not specified, using: $OutputPath"
 }
