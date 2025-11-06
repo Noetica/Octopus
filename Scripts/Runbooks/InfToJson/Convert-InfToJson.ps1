@@ -365,6 +365,9 @@ function ConvertTo-JSONC {
         $TrailingComments = @{},
 
         [Parameter(Mandatory = $false)]
+        $CommentedSectionBlocks = @(),
+
+        [Parameter(Mandatory = $false)]
         [int]$Depth = 10,
 
         [Parameter(Mandatory = $false)]
@@ -476,6 +479,20 @@ function ConvertTo-JSONC {
             $valueJson = ConvertTo-JsonValue -Value $sectionValue -IndentLevel ($IndentLevel + 1)
             $comma = if ($isLastSection) { "" } else { "," }
             $lines += "$nextIndent`"$sectionKey`": $valueJson$comma"
+        }
+
+        # Check if there are any commented section blocks that should appear after this section
+        foreach ($block in $CommentedSectionBlocks) {
+            if ($block.AfterSection -eq $sectionKey) {
+                # Output the commented section block
+                $escapedBlockName = $block.SectionName -replace '\\', '\\' -replace '"', '\"'
+                $lines += "$nextIndent// `"$escapedBlockName`": {"
+                foreach ($comment in $block.Comments) {
+                    $lines += "$nextIndent//     $comment"
+                }
+                $comma = if ($isLastSection) { "" } else { "," }
+                $lines += "$nextIndent// }$comma"
+            }
         }
     }
 
@@ -613,6 +630,9 @@ $trailingComments = [ordered]@{}  # Trailing comments after keys
 $pendingComments = @()  # Comments waiting to be associated
 $sectionComments = [ordered]@{}  # Comments for sections
 $lastKey = $null  # Track the last processed key for trailing comments
+$commentedSectionBlocks = [System.Collections.ArrayList]@()  # Track commented section blocks
+$inCommentedSectionBlock = $false  # Flag to track if we're in a commented section block
+$currentCommentedBlock = $null  # Current commented section block being built
 
 # Read and process the INF file
 try {
@@ -631,12 +651,49 @@ try {
                 # Remove comment prefix and store
                 $commentText = $line -replace '^[;#]\s*', '' -replace '^//\s*', ''
 
-                # Convert INF syntax in comments to JSON syntax
+                # Check if this is a commented section header
+                if ($commentText -match '^\[([^\[\]\r\n\t]+)\]$') {
+                    # Close previous commented section block if one exists
+                    if ($inCommentedSectionBlock -and $currentCommentedBlock -ne $null) {
+                        $null = $commentedSectionBlocks.Add($currentCommentedBlock)
+                        Write-Verbose "Closed commented section block [$($currentCommentedBlock.SectionName)] with $($currentCommentedBlock.Comments.Count) lines"
+                    }
+
+                    # Start a new commented section block
+                    $commentedSectionName = $matches[1].Trim()
+                    $inCommentedSectionBlock = $true
+                    $currentCommentedBlock = @{
+                        SectionName = $commentedSectionName
+                        Comments = @()
+                        AfterSection = $section  # Track which section this follows
+                    }
+                    Write-Verbose "Line ${lineNumber}: Started commented section block [$commentedSectionName]"
+                    return
+                }
+
+                # If we're in a commented section block, add to it
+                if ($inCommentedSectionBlock) {
+                    # Convert INF syntax in comments to JSON syntax
+                    $jsonComment = ConvertTo-JsonComment -CommentText $commentText -CurrentSection $null
+                    $currentCommentedBlock.Comments += $jsonComment
+                    Write-Verbose "Line ${lineNumber}: Added to commented section block: $jsonComment"
+                    return
+                }
+
+                # Regular comment - convert INF syntax to JSON syntax
                 $jsonComment = ConvertTo-JsonComment -CommentText $commentText -CurrentSection $section
                 $pendingComments += $jsonComment
                 Write-Verbose "Line ${lineNumber}: Captured comment: $jsonComment"
             }
             return
+        }
+
+        # If we reach here with a non-comment line, close any commented section block
+        if ($inCommentedSectionBlock -and $currentCommentedBlock -ne $null) {
+            $null = $commentedSectionBlocks.Add($currentCommentedBlock)
+            Write-Verbose "Closed commented section block [$($currentCommentedBlock.SectionName)] with $($currentCommentedBlock.Comments.Count) lines"
+            $inCommentedSectionBlock = $false
+            $currentCommentedBlock = $null
         }
 
         # Section header: [SectionName]
@@ -794,6 +851,12 @@ if ($StrictMode -and $script:HasErrors) {
     throw "Processing failed due to errors (StrictMode enabled)"
 }
 
+# Close any remaining commented section block
+if ($PreserveComments -and $inCommentedSectionBlock -and $currentCommentedBlock -ne $null) {
+    $null = $commentedSectionBlocks.Add($currentCommentedBlock)
+    Write-Verbose "Closed final commented section block [$($currentCommentedBlock.SectionName)] with $($currentCommentedBlock.Comments.Count) lines"
+}
+
 # Handle any remaining pending comments - assign to last key or section
 if ($PreserveComments -and $pendingComments.Count -gt 0 -and $section) {
     if ($lastKey) {
@@ -849,7 +912,7 @@ if ($result.Count -gt $MaxSections) {
 if ($PreserveComments) {
     Write-Verbose "Generating JSONC output with preserved comments"
     try {
-        $jsonOutput = ConvertTo-JSONC -Data $result -Comments $comments -SectionComments $sectionComments -TrailingComments $trailingComments -Depth $Depth
+        $jsonOutput = ConvertTo-JSONC -Data $result -Comments $comments -SectionComments $sectionComments -TrailingComments $trailingComments -CommentedSectionBlocks $commentedSectionBlocks -Depth $Depth
     } catch {
         throw "Error converting to JSONC: $_"
     }
