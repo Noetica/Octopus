@@ -983,6 +983,21 @@ try {
         $jsonOutput | Out-File -FilePath $OutputPath -Encoding UTF8 -Force
         Write-Verbose "JSON file written to: $OutputPath"
         Write-Verbose "Output file size: $([math]::Round((Get-Item -LiteralPath $OutputPath).Length / 1KB, 2)) KB"
+    } else {
+        # WhatIf mode - return early without accessing file
+        Write-Verbose "WhatIf mode: Conversion would have been successful"
+        return [PSCustomObject]@{
+            Success = $true
+            SourceFile = $InfPath
+            SourceFileSizeKB = [math]::Round($fileInfo.Length / 1KB, 2)
+            OutputFile = $OutputPath
+            OutputFileSizeKB = 0
+            SectionsProcessed = $result.Count
+            LinesProcessed = $lineNumber
+            Warnings = $script:WarningCount
+            Errors = "WhatIf mode - no file written"
+            ConversionTime = (Get-Date)
+        }
     }
 } catch {
     throw "Error writing JSON file to '$OutputPath': $_"
