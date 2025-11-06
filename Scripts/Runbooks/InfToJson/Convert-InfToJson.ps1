@@ -26,6 +26,9 @@
 .PARAMETER StripQuotes
     When enabled, removes surrounding quotes from string values.
 
+.PARAMETER EmptyAsNull
+    When enabled, converts empty values (key=) to JSON null instead of empty strings.
+
 .PARAMETER DefaultSection
     Name for the section to use for key-value pairs found before any section header.
     Default: "_global_"
@@ -51,8 +54,12 @@
     Creates C:\output\config.json
 
 .EXAMPLE
-    .\InfToJson.ps1 -InfPath "C:\config\app.inf" -StrictMode -StripQuotes
+    .\Convert-InfToJson.ps1 -InfPath "C:\config\app.inf" -StrictMode -StripQuotes
     Creates C:\config\app.json with strict validation
+
+.EXAMPLE
+    .\Convert-InfToJson.ps1 -InfPath "C:\config\app.inf" -EmptyAsNull
+    Creates C:\config\app.json with empty values converted to null
 
 .NOTES
     Author: Enhanced by code review
@@ -79,6 +86,9 @@ param(
 
     [Parameter(Mandatory = $false)]
     [switch]$StripQuotes,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$EmptyAsNull,
 
     [Parameter(Mandatory = $false)]
     [string]$DefaultSection = '_global_',
@@ -132,8 +142,11 @@ function ConvertTo-TypedValue {
         }
     }
 
-    # Empty string
+    # Empty string - convert to null if requested
     if ($Value -eq '') {
+        if ($EmptyAsNull) {
+            return $null
+        }
         return $Value
     }
 
@@ -277,6 +290,7 @@ Write-Verbose "Encoding: $Encoding"
 Write-Verbose "Strict Mode: $StrictMode"
 Write-Verbose "Type Conversion: $(-not $NoTypeConversion)"
 Write-Verbose "Strip Quotes: $StripQuotes"
+Write-Verbose "Empty As Null: $EmptyAsNull"
 Write-Verbose "Max File Size: $MaxFileSizeMB MB"
 Write-Verbose "Max Sections: $MaxSections"
 
@@ -386,7 +400,9 @@ try {
             # Convert value to appropriate type
             $typedValue = ConvertTo-TypedValue -Value $rawValue
 
-            Write-Verbose "Line ${lineNumber}: [$section] $key = $rawValue (Type: $($typedValue.GetType().Name))"
+            # Handle null type for verbose logging
+            $typeName = if ($null -eq $typedValue) { "Null" } else { $typedValue.GetType().Name }
+            Write-Verbose "Line ${lineNumber}: [$section] $key = $rawValue (Type: $typeName)"
 
             $result[$section][$key] = $typedValue
             $sectionHasKeyValue[$section] = $true
