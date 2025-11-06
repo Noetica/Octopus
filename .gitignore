@@ -1,0 +1,9 @@
+# Ignore sensitive synthesys INF files in any location
+**/synthesys.*.inf
+**/synthesys.inf
+synthesys.*.inf
+synthesys.inf
+
+# Also ignore any files starting with synthesys
+**/synthesys.*
+synthesys.*
