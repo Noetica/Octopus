@@ -33,6 +33,15 @@
 .PARAMETER Depth
     Maximum depth for JSON conversion. Default: 10
 
+.PARAMETER MaxFileSizeMB
+    Maximum allowed file size in megabytes. Default: 100MB
+
+.PARAMETER MaxSections
+    Maximum number of sections allowed. Default: 10000
+
+.PARAMETER Force
+    Overwrite output file if it exists without prompting.
+
 .EXAMPLE
     .\InfToJson.ps1 -InfPath "C:\config\app.inf"
     Creates C:\config\app.json
@@ -47,10 +56,10 @@
 
 .NOTES
     Author: Enhanced by code review
-    Version: 2.0
+    Version: 2.1
 #>
 
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Mandatory = $false)]
     [string]$InfPath,
@@ -76,14 +85,28 @@ param(
 
     [Parameter(Mandatory = $false)]
     [ValidateRange(1, 100)]
-    [int]$Depth = 10
+    [int]$Depth = 10,
+
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(1, 1024)]
+    [int]$MaxFileSizeMB = 100,
+
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(1, 100000)]
+    [int]$MaxSections = 10000,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Force
 )
 
-# Initialize error tracking for strict mode
+# Initialize error and warning tracking
 $script:HasErrors = $false
+$script:WarningCount = 0
 
 function Write-ScriptWarning {
     param([string]$Message)
+
+    $script:WarningCount++
 
     if ($StrictMode) {
         $script:HasErrors = $true
@@ -137,14 +160,9 @@ function ConvertTo-TypedValue {
             $int64Value = [int64]$Value
             return $int64Value
         } catch [System.OverflowException] {
-            # Number too large for int64, try as double
-            Write-Verbose "Value '$Value' too large for int64, converting to double"
-            try {
-                return [double]$Value
-            } catch {
-                Write-Verbose "Failed to convert large number '$Value': $_"
-                return $Value
-            }
+            # Number too large for int64, keep as string to preserve exact value
+            Write-Verbose "Value '$Value' exceeds int64 range, keeping as string to preserve precision"
+            return $Value
         } catch {
             Write-Verbose "Failed to convert '$Value' to integer: $_"
             return $Value
@@ -155,6 +173,65 @@ function ConvertTo-TypedValue {
     return $Value
 }
 
+function Test-PathSafety {
+    param(
+        [string]$Path,
+        [string]$PathType
+    )
+
+    # Check for path traversal sequences
+    $normalizedPath = $Path -replace '\\', '/'
+    if ($normalizedPath -match '\.\./|/\.\.' -or $normalizedPath -match '\.\.\\|\\\.\.') {
+        throw "$PathType path contains potentially unsafe traversal sequences: $Path"
+    }
+
+    # Check for invalid characters
+    $invalidChars = [System.IO.Path]::GetInvalidPathChars()
+    foreach ($char in $invalidChars) {
+        if ($Path.Contains($char)) {
+            throw "$PathType path contains invalid character: $char"
+        }
+    }
+}
+
+function Test-FileReadable {
+    param([string]$Path)
+
+    try {
+        # Resolve to absolute path if relative
+        $resolvedPath = Resolve-Path -LiteralPath $Path -ErrorAction Stop
+        $stream = [System.IO.File]::OpenRead($resolvedPath.Path)
+        $stream.Close()
+        $stream.Dispose()
+    } catch [System.Management.Automation.ItemNotFoundException] {
+        throw "File not found: $Path"
+    } catch [System.UnauthorizedAccessException] {
+        throw "Access denied reading file: $Path"
+    } catch [System.IO.IOException] {
+        throw "I/O error accessing file: $Path - $($_.Exception.Message)"
+    } catch {
+        throw "Cannot read file '$Path': $($_.Exception.Message)"
+    }
+}
+
+function Test-DirectoryWritable {
+    param([string]$DirectoryPath)
+
+    if (-not (Test-Path -LiteralPath $DirectoryPath -PathType Container)) {
+        throw "Directory does not exist: $DirectoryPath"
+    }
+
+    try {
+        $testFile = Join-Path $DirectoryPath ([System.IO.Path]::GetRandomFileName())
+        $null = New-Item -Path $testFile -ItemType File -Force -ErrorAction Stop -WhatIf:$false
+        Remove-Item -Path $testFile -Force -ErrorAction Stop -WhatIf:$false
+    } catch [System.UnauthorizedAccessException] {
+        throw "Access denied writing to directory: $DirectoryPath"
+    } catch {
+        throw "Cannot write to directory '$DirectoryPath': $_"
+    }
+}
+
 # Determine INF file path
 if (-not $InfPath) {
     # Try to get from Octopus variable
@@ -163,19 +240,45 @@ if (-not $InfPath) {
     }
 }
 
-if (-not $InfPath) {
+# Validate INF path is provided
+if ([string]::IsNullOrWhiteSpace($InfPath)) {
     throw "INF file path not provided. Use -InfPath parameter or set Octopus variable 'Noetica.Inf'"
 }
 
-if (-not (Test-Path $InfPath -PathType Leaf)) {
+# Validate INF file path safety
+try {
+    $null = Test-PathSafety -Path $InfPath -PathType "Input"
+} catch {
+    throw $_
+}
+
+# Check INF file exists
+if (-not (Test-Path -LiteralPath $InfPath -PathType Leaf)) {
     throw "INF file not found at: $InfPath"
 }
 
+# Validate file size
+$maxFileSizeBytes = $MaxFileSizeMB * 1MB
+$fileInfo = Get-Item -LiteralPath $InfPath -ErrorAction Stop
+if ($fileInfo.Length -gt $maxFileSizeBytes) {
+    throw "File size ($([math]::Round($fileInfo.Length / 1MB, 2)) MB) exceeds maximum allowed ($MaxFileSizeMB MB)"
+}
+
+# Validate file is readable
+try {
+    $null = Test-FileReadable -Path $InfPath
+} catch {
+    throw $_
+}
+
 Write-Verbose "Processing INF file: $InfPath"
+Write-Verbose "File size: $([math]::Round($fileInfo.Length / 1KB, 2)) KB"
 Write-Verbose "Encoding: $Encoding"
 Write-Verbose "Strict Mode: $StrictMode"
 Write-Verbose "Type Conversion: $(-not $NoTypeConversion)"
 Write-Verbose "Strip Quotes: $StripQuotes"
+Write-Verbose "Max File Size: $MaxFileSizeMB MB"
+Write-Verbose "Max Sections: $MaxSections"
 
 # Initialize result structure
 $result = @{}
@@ -187,23 +290,30 @@ $lineNumber = 0
 
 # Read and process the INF file
 try {
-    Get-Content -Path $InfPath -Encoding $Encoding -ErrorAction Stop | ForEach-Object {
+    Get-Content -LiteralPath $InfPath -Encoding $Encoding -ErrorAction Stop | ForEach-Object {
         $lineNumber++
         $line = $_.Trim()
 
         # Skip empty lines and full-line comments
-        if ($line -eq '' -or $line -match '^[;#]') {
+        # Support ;, #, and // style comments
+        if ($line -eq '' -or $line -match '^[;#]' -or $line -match '^//') {
             return
         }
 
         # Section header: [SectionName]
-        if ($line -match '^\[(.+?)\]$') {
+        # More restrictive regex - disallow brackets, newlines, and control characters in section names
+        if ($line -match '^\[([^\[\]\r\n\t]+)\]$') {
             $sectionName = $matches[1].Trim()
 
             # Check for empty section name
             if ($sectionName -eq '') {
                 Write-ScriptWarning "Line ${lineNumber}: Empty section name '[]' found"
                 return
+            }
+
+            # Check section count limit
+            if ($result.Count -ge $MaxSections) {
+                throw "Number of sections exceeds maximum allowed ($MaxSections). Consider increasing -MaxSections parameter."
             }
 
             # Check for duplicate section
@@ -227,13 +337,20 @@ try {
         }
 
         # Key-value pair: Key=Value
-        if ($line -match '^([^=]+?)=(.*)$') {
+        # More restrictive key validation - alphanumeric, spaces, underscores, hyphens, dots
+        if ($line -match '^([A-Za-z0-9_\-\.\s]+?)\s*=\s*(.*)$') {
             $key = $matches[1].Trim()
             $rawValue = $matches[2].Trim()
 
             # Validate key
             if ($key -eq '') {
                 Write-ScriptWarning "Line ${lineNumber}: Empty key name found"
+                return
+            }
+
+            # Additional key validation - no leading/trailing dots or hyphens
+            if ($key -match '^[\.\-]|[\.\-]$') {
+                Write-ScriptWarning "Line ${lineNumber}: Invalid key format (leading/trailing dots or hyphens): '$key'"
                 return
             }
 
@@ -288,7 +405,7 @@ try {
         Write-ScriptWarning "Line ${lineNumber}: Unable to parse line: $line"
     }
 } catch {
-    throw "Error reading INF file: $_"
+    throw "Error reading INF file at line ${lineNumber}: $_"
 }
 
 # Check if we encountered any errors in strict mode
@@ -297,7 +414,8 @@ if ($StrictMode -and $script:HasErrors) {
 }
 
 # Process sections with array items
-foreach ($sectionName in $sectionArrayItems.Keys) {
+# Use array copy to avoid modification during enumeration
+foreach ($sectionName in @($sectionArrayItems.Keys)) {
     if ($sectionArrayItems[$sectionName].Count -gt 0) {
         # If section has NO key=value pairs, make it a pure array
         if (-not $sectionHasKeyValue[$sectionName]) {
@@ -320,9 +438,19 @@ if ($result.Count -eq 0) {
     Write-Warning "No sections or data found in INF file"
 }
 
+# Validate section count
+if ($result.Count -gt $MaxSections) {
+    throw "Number of sections ($($result.Count)) exceeds maximum allowed ($MaxSections)"
+}
+
 # Convert to JSON
 try {
     $jsonOutput = $result | ConvertTo-Json -Depth $Depth -Compress:$false
+
+    # Check if JSON might be truncated due to depth limit
+    if ($jsonOutput -match 'System\.Collections' -or ($Depth -lt 5 -and $result.Count -gt 10)) {
+        Write-Warning "JSON output may be truncated due to depth limit. Consider increasing -Depth parameter (current: $Depth)"
+    }
 } catch {
     throw "Error converting to JSON: $_"
 }
@@ -330,20 +458,77 @@ try {
 # Determine output file path
 if (-not $OutputPath) {
     # Generate output path from input path (same location, .json extension)
-    $infFileInfo = Get-Item -Path $InfPath
+    $infFileInfo = Get-Item -LiteralPath $InfPath
     $outputFileName = [System.IO.Path]::GetFileNameWithoutExtension($infFileInfo.Name) + ".json"
     $OutputPath = Join-Path $infFileInfo.DirectoryName $outputFileName
     Write-Verbose "Output path not specified, using: $OutputPath"
 }
 
+# Validate output path safety
+try {
+    $null = Test-PathSafety -Path $OutputPath -PathType "Output"
+} catch {
+    throw $_
+}
+
+# Ensure output directory exists
+$outputDir = Split-Path -Path $OutputPath -Parent
+if ($outputDir -and -not (Test-Path -LiteralPath $outputDir -PathType Container)) {
+    try {
+        $null = New-Item -Path $outputDir -ItemType Directory -Force -ErrorAction Stop
+        Write-Verbose "Created output directory: $outputDir"
+    } catch {
+        throw "Cannot create output directory '$outputDir': $_"
+    }
+}
+
+# Validate output directory is writable
+if ($outputDir) {
+    try {
+        $null = Test-DirectoryWritable -DirectoryPath $outputDir
+    } catch {
+        throw $_
+    }
+}
+
+# Check if output file exists and handle -Force
+if ((Test-Path -LiteralPath $OutputPath) -and -not $Force) {
+    if ($PSCmdlet.ShouldProcess($OutputPath, "Overwrite existing file")) {
+        # Continue with write
+    } else {
+        Write-Warning "Output file exists and -Force not specified. Use -Force to overwrite."
+        return
+    }
+}
+
 # Write JSON to file
 try {
-    $jsonOutput | Out-File -FilePath $OutputPath -Encoding UTF8 -Force
-    Write-Verbose "JSON file written to: $OutputPath"
+    if ($PSCmdlet.ShouldProcess($OutputPath, "Write JSON output")) {
+        $jsonOutput | Out-File -FilePath $OutputPath -Encoding UTF8 -Force
+        Write-Verbose "JSON file written to: $OutputPath"
+        Write-Verbose "Output file size: $([math]::Round((Get-Item -LiteralPath $OutputPath).Length / 1KB, 2)) KB"
+    }
 } catch {
     throw "Error writing JSON file to '$OutputPath': $_"
 }
 
 Write-Verbose "Conversion completed successfully"
 Write-Verbose "Sections processed: $($result.Count)"
+Write-Verbose "Lines processed: $lineNumber"
+Write-Verbose "Warnings: $script:WarningCount"
+
 Write-Host "Successfully converted '$InfPath' to '$OutputPath'" -ForegroundColor Green
+
+# Return summary object
+return [PSCustomObject]@{
+    Success = $true
+    SourceFile = $InfPath
+    SourceFileSizeKB = [math]::Round($fileInfo.Length / 1KB, 2)
+    OutputFile = $OutputPath
+    OutputFileSizeKB = [math]::Round((Get-Item -LiteralPath $OutputPath).Length / 1KB, 2)
+    SectionsProcessed = $result.Count
+    LinesProcessed = $lineNumber
+    Warnings = $script:WarningCount
+    Errors = if ($script:HasErrors) { "Errors encountered in StrictMode" } else { "None" }
+    ConversionTime = (Get-Date)
+}
