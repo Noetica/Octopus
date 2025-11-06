@@ -7,6 +7,7 @@ Complete guide to all parameters and their behaviors for converting INF files to
 ## Table of Contents
 - [Quick Reference](#quick-reference)
 - [Type Conversion Parameters](#type-conversion-parameters)
+- [Comment Preservation (JSONC)](#comment-preservation-jsonc)
 - [File Handling Parameters](#file-handling-parameters)
 - [Validation Parameters](#validation-parameters)
 - [Advanced Parameters](#advanced-parameters)
@@ -27,6 +28,7 @@ Complete guide to all parameters and their behaviors for converting INF files to
 | `-StripQuotes` | Switch | False | Remove surrounding quotes from values |
 | `-EmptyAsNull` | Switch | False | Convert empty values to JSON null |
 | `-YesNoAsBoolean` | Switch | False | Convert Yes/No to true/false |
+| `-PreserveComments` | Switch | False | Preserve comments as JSONC output |
 | `-DefaultSection` | String | _global_ | Section name for keys before first section |
 | `-Depth` | Int | 10 | Maximum JSON depth |
 | `-MaxFileSizeMB` | Int | 100 | Maximum INF file size in MB |
@@ -249,6 +251,267 @@ Path='C:\Program Files'
 
 ---
 
+## Comment Preservation (JSONC)
+
+### `-PreserveComments` Switch
+
+When enabled, the script:
+1. Outputs `.jsonc` file format (JSON with Comments)
+2. Preserves all comments from the INF file
+3. Intelligently converts commented INF syntax to JSON syntax
+4. Maintains comment positioning (leading, trailing, section-level)
+5. Handles commented-out section blocks
+
+**Basic Example:**
+
+**INF Input:**
+```ini
+[Database]
+; Production database settings
+Host=localhost
+Port=5432
+; Username=admin
+; Password=secret
+```
+
+**Command:**
+```powershell
+./Convert-InfToJson.ps1 -InfPath config.inf -PreserveComments
+```
+
+**JSONC Output:**
+```jsonc
+{
+  "Database": {
+      // Production database settings
+      "Host": "localhost",
+      "Port": 5432
+      // "Username": "admin",
+      // "Password": "secret",
+  }
+}
+```
+
+### Comment Positioning
+
+#### Leading Comments (Before Properties)
+Comments that appear before a property are placed before it in JSONC:
+
+**INF:**
+```ini
+[Settings]
+; This enables debug mode
+Debug=Yes
+```
+
+**JSONC:**
+```jsonc
+{
+  "Settings": {
+      // This enables debug mode
+      "Debug": true
+  }
+}
+```
+
+#### Trailing Comments (After Properties)
+Comments that appear after a property are placed after it in JSONC:
+
+**INF:**
+```ini
+[Settings]
+Debug=Yes
+; Enable for production only
+; Requires restart
+```
+
+**JSONC:**
+```jsonc
+{
+  "Settings": {
+      "Debug": true
+      // Enable for production only
+      // Requires restart
+  }
+}
+```
+
+#### Section-Level Comments
+Comments right after a section header appear at the top of that section:
+
+**INF:**
+```ini
+[Database]
+; Connection settings for production
+; Update before deployment
+Host=localhost
+Port=5432
+```
+
+**JSONC:**
+```jsonc
+{
+  "Database": {
+      // Connection settings for production
+      // Update before deployment
+      "Host": "localhost",
+      "Port": 5432
+  }
+}
+```
+
+### Commented Section Blocks
+
+When entire sections are commented out, they're preserved as cohesive blocks:
+
+**INF:**
+```ini
+[Active Section]
+Key=Value
+
+;[Disabled Section]
+;DebugMode=Yes
+;LogLevel=Verbose
+
+[Another Active Section]
+Setting=Enabled
+```
+
+**JSONC:**
+```jsonc
+{
+  "Active Section": {
+      "Key": "Value"
+  },
+  // "Disabled Section": {
+  //     "DebugMode": true,
+  //     "LogLevel": "Verbose",
+  // },
+  "Another Active Section": {
+      "Setting": "Enabled"
+  }
+}
+```
+
+### INF-to-JSON Syntax Conversion
+
+Commented INF syntax is automatically converted to JSON format, making it easy to uncomment:
+
+**INF:**
+```ini
+[Email Service]
+;SMTP Server=smtp.gmail.com
+;SMTP Port=587
+;Use TLS=Yes
+;From Address=noreply@example.com
+ActiveServer=mail.example.com
+```
+
+**JSONC:**
+```jsonc
+{
+  "Email Service": {
+      // "SMTP Server": "smtp.gmail.com",
+      // "SMTP Port": 587,
+      // "Use TLS": true,
+      // "From Address": "noreply@example.com",
+      "ActiveServer": "mail.example.com"
+  }
+}
+```
+
+**Uncommenting:** Simply remove the `//` to activate commented properties:
+```jsonc
+{
+  "Email Service": {
+      "SMTP Server": "smtp.gmail.com",  // ← Now active!
+      "SMTP Port": 587,                  // ← Now active!
+      "Use TLS": true,                   // ← Now active!
+      "From Address": "noreply@example.com", // ← Now active!
+      "ActiveServer": "mail.example.com"
+  }
+}
+```
+
+### Type Conversion with Comments
+
+Type conversion parameters work with `-PreserveComments`:
+
+**Command:**
+```powershell
+./Convert-InfToJson.ps1 -InfPath config.inf -PreserveComments -YesNoAsBoolean -EmptyAsNull
+```
+
+**INF:**
+```ini
+[Settings]
+; Enable=Yes
+Debug=No
+; Timeout=30
+LogPath=
+```
+
+**JSONC:**
+```jsonc
+{
+  "Settings": {
+      // "Enable": true,      ← Boolean conversion applied
+      "Debug": false,
+      // "Timeout": 30,       ← Integer preserved
+      "LogPath": null         ← Empty becomes null
+  }
+}
+```
+
+### JSONC vs JSON Output
+
+| Feature | JSON (default) | JSONC (`-PreserveComments`) |
+|---------|---------------|----------------------------|
+| File Extension | `.json` | `.jsonc` |
+| Comments | Not preserved | Preserved |
+| Commented sections | Ignored | Preserved as blocks |
+| Uncommenting | N/A | Produces valid JSON |
+| File Size | Smaller | Larger (~30% more) |
+| Editor Support | Universal | VS Code, IntelliJ, etc. |
+
+### Real-World Example
+
+**Production Configuration with Documentation:**
+
+```powershell
+./Convert-InfToJson.ps1 `
+    -InfPath synthesys.template.inf `
+    -PreserveComments `
+    -YesNoAsBoolean `
+    -EmptyAsNull `
+    -StripQuotes `
+    -Verbose
+```
+
+This creates a `.jsonc` file that:
+- ✅ Preserves all documentation comments
+- ✅ Keeps commented-out configuration options
+- ✅ Converts types appropriately
+- ✅ Can be uncommented for immediate use
+- ✅ Maintains all structural relationships
+
+### When to Use `-PreserveComments`
+
+**Use JSONC for:**
+- 📝 Configuration files with documentation
+- 🔧 Template files with optional settings
+- 📋 Files with commented-out alternatives
+- 👥 Team environments where comments help understanding
+- 🔄 Files that change frequently and need context
+
+**Use JSON for:**
+- 🚀 Production data files
+- 🤖 Machine-to-machine communication
+- 📦 Minimal file size requirements
+- 🔒 No need for human-readable comments
+
+---
+
 ## File Handling Parameters
 
 ### `-InfPath` (Required)
@@ -468,7 +731,7 @@ Maximum depth for JSON conversion.
 
 ---
 
-### Scenario 3: Strict Validation for CI/CD
+### Scenario 8: Strict Validation for CI/CD
 
 **Goal:** Fail fast on any data quality issues.
 

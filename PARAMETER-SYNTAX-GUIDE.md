@@ -84,9 +84,38 @@ Switch parameters don't need a value - their presence means "true":
 ./Convert-InfToJson.ps1 -InfPath config.inf -YesNoAsBoolean -EmptyAsNull
 ```
 
-### With Comments Preserved
+### With Comments Preserved (JSONC Output)
 ```powershell
 ./Convert-InfToJson.ps1 -InfPath config.inf -PreserveComments
+```
+
+**What this does:**
+- Creates `.jsonc` file (JSON with Comments)
+- Preserves all comments from INF file
+- Converts commented INF syntax to JSON format
+- Comments can be uncommented to activate settings
+
+**Example Input (config.inf):**
+```ini
+[Database]
+; Production database settings
+Host=localhost
+Port=5432
+; Username=admin
+; Password=secret
+```
+
+**Example Output (config.jsonc):**
+```jsonc
+{
+  "Database": {
+      // Production database settings
+      "Host": "localhost",
+      "Port": 5432
+      // "Username": "admin",
+      // "Password": "secret",
+  }
+}
 ```
 
 ### With Validation Limits
@@ -157,14 +186,33 @@ For readability, use backticks (`` ` ``) to continue commands on multiple lines:
 - Empty values become `null`
 - Yes/No becomes `true`/`false`
 
-### Documentation Mode
+### Documentation Mode (JSONC with Comments)
 ```powershell
 ./Convert-InfToJson.ps1 -InfPath file.inf -PreserveComments -YesNoAsBoolean
 ```
-- Creates `.jsonc` file
-- Preserves all comments
-- Converts commented INF syntax to JSON
-- Ready to uncomment
+- Creates `.jsonc` file with all comments
+- Converts Yes/No to true/false
+- Commented properties use JSON syntax
+- Uncomment to activate settings
+
+**Example:**
+```ini
+[Email]
+;SMTP Server=smtp.gmail.com
+;Use TLS=Yes
+ActiveServer=mail.local
+```
+
+**Becomes:**
+```jsonc
+{
+  "Email": {
+      // "SMTP Server": "smtp.gmail.com",
+      // "Use TLS": true,
+      "ActiveServer": "mail.local"
+  }
+}
+```
 
 ### Security/Validation Mode
 ```powershell
@@ -230,7 +278,7 @@ Get-Help ./Convert-InfToJson.ps1 -Parameter PreserveComments
 | StripQuotes | Switch | `-StripQuotes` | false |
 | EmptyAsNull | Switch | `-EmptyAsNull` | false |
 | YesNoAsBoolean | Switch | `-YesNoAsBoolean` | false |
-| PreserveComments | Switch | `-PreserveComments` | false |
+| PreserveComments | Switch | `-PreserveComments` | false (creates .jsonc) |
 | StrictMode | Switch | `-StrictMode` | false |
 | MaxSections | Integer | `-MaxSections 100` | 10000 |
 | MaxFileSizeMB | Integer | `-MaxFileSizeMB 50` | 100 |
@@ -284,6 +332,140 @@ Get-Help ./Convert-InfToJson.ps1 -Parameter PreserveComments
 5. **Enable -StrictMode for production:** Catch issues early
 6. **Set appropriate limits:** Use -MaxSections and -MaxFileSizeMB for security
 7. **Preserve comments for documentation:** Use -PreserveComments for configuration files
+
+---
+
+---
+
+## JSONC (JSON with Comments) Details
+
+### What is JSONC?
+
+JSONC is JSON with Comments - a format that allows `//` style comments in JSON files. It's supported by:
+- Visual Studio Code
+- IntelliJ IDEA
+- Many modern editors and tools
+
+### When to Use `-PreserveComments`
+
+**Use for:**
+- 📝 Configuration files needing documentation
+- 🔧 Template files with optional settings
+- 📋 Files with commented alternatives
+- 👥 Team environments
+- 🔄 Frequently changing configurations
+
+**Don't use for:**
+- 🤖 Machine-only data
+- 📦 Minimal file size needs
+- 🔒 No human comments needed
+
+### JSONC Features
+
+#### 1. Leading Comments
+Comments before properties stay before them:
+```jsonc
+{
+  "Settings": {
+      // This enables debug mode
+      "Debug": true
+  }
+}
+```
+
+#### 2. Trailing Comments
+Comments after properties stay after them:
+```jsonc
+{
+  "Settings": {
+      "Debug": true
+      // Restart required for changes
+  }
+}
+```
+
+#### 3. Commented Section Blocks
+Entire commented sections are preserved:
+```jsonc
+{
+  "Active Section": {
+      "Key": "Value"
+  },
+  // "Disabled Section": {
+  //     "Key": "Value",
+  // },
+  "Another Section": {
+      "Key": "Value"
+  }
+}
+```
+
+#### 4. INF-to-JSON Conversion
+Commented properties are converted to valid JSON syntax:
+
+**INF:**
+```ini
+;Server=localhost
+;Port=5432
+;Enabled=Yes
+```
+
+**JSONC:**
+```jsonc
+// "Server": "localhost",
+// "Port": 5432,
+// "Enabled": true,
+```
+
+**To activate:** Simply remove `//` and it's valid JSON!
+
+### Complete JSONC Example
+
+```powershell
+./Convert-InfToJson.ps1 `
+    -InfPath synthesys.template.inf `
+    -PreserveComments `
+    -YesNoAsBoolean `
+    -EmptyAsNull `
+    -Verbose
+```
+
+**Input (synthesys.template.inf):**
+```ini
+[System]
+; Company configuration
+CompanyName=Acme Corp
+;BackupServer=backup.acme.com
+LocalServer=main.acme.com
+
+;[Development]
+;Debug=Yes
+;LogLevel=Verbose
+
+[Production]
+Debug=No
+LogLevel=Error
+```
+
+**Output (synthesys.template.jsonc):**
+```jsonc
+{
+  "System": {
+      // Company configuration
+      "CompanyName": "Acme Corp",
+      // "BackupServer": "backup.acme.com",
+      "LocalServer": "main.acme.com"
+  },
+  // "Development": {
+  //     "Debug": true,
+  //     "LogLevel": "Verbose",
+  // },
+  "Production": {
+      "Debug": false,
+      "LogLevel": "Error"
+  }
+}
+```
 
 ---
 
