@@ -5,6 +5,7 @@ Complete guide to all parameters and their behaviors for converting INF files to
 ---
 
 ## Table of Contents
+- [PowerShell Syntax](#powershell-syntax)
 - [Quick Reference](#quick-reference)
 - [Type Conversion Parameters](#type-conversion-parameters)
 - [Comment Preservation (JSONC)](#comment-preservation-jsonc)
@@ -13,6 +14,99 @@ Complete guide to all parameters and their behaviors for converting INF files to
 - [Advanced Parameters](#advanced-parameters)
 - [Common Scenarios](#common-scenarios)
 - [Parameter Interactions](#parameter-interactions)
+
+---
+
+## PowerShell Syntax
+
+### Common Mistake: Using Equals Sign
+
+**❌ INCORRECT - This will NOT work:**
+```powershell
+./Convert-InfToJson.ps1 -MaxSections=2
+./Convert-InfToJson.ps1 -InfPath=file.inf
+./Convert-InfToJson.ps1 -YesNoAsBoolean=true
+```
+
+**Error you'll see:**
+```
+A parameter cannot be found that matches parameter name 'MaxSections=2'
+```
+
+**✅ CORRECT - Use a space, not equals:**
+```powershell
+./Convert-InfToJson.ps1 -MaxSections 2
+./Convert-InfToJson.ps1 -InfPath file.inf
+./Convert-InfToJson.ps1 -YesNoAsBoolean
+```
+
+### Parameter Types
+
+#### Parameters with Values
+Use a **space** between parameter name and value:
+
+```powershell
+# String parameters
+-InfPath ./config/app.inf
+-OutputPath ./output/app.json
+-DefaultSection "GlobalSettings"
+-Encoding UTF8
+
+# Integer parameters
+-MaxSections 100
+-MaxFileSizeMB 50
+-Depth 10
+```
+
+#### Switch Parameters (Boolean)
+Switch parameters don't need a value - their presence means "true":
+
+```powershell
+# Correct - just use the parameter name
+-NoTypeConversion
+-StripQuotes
+-EmptyAsNull
+-YesNoAsBoolean
+-PreserveComments
+-StrictMode
+-Force
+-Verbose
+-WhatIf
+
+# Don't do this (unnecessary)
+-YesNoAsBoolean $true
+-PreserveComments true
+```
+
+### Multi-Line Commands
+
+For readability, use backticks (`` ` ``) to continue commands on multiple lines:
+
+```powershell
+./Convert-InfToJson.ps1 `
+    -InfPath ./config/app.inf `
+    -OutputPath ./output/app.jsonc `
+    -PreserveComments `
+    -YesNoAsBoolean `
+    -EmptyAsNull `
+    -MaxSections 100 `
+    -Verbose
+```
+
+**Note:** The backtick must be the **last character** on the line (no spaces after it).
+
+### File Paths with Spaces
+
+Always quote paths containing spaces:
+
+```powershell
+# Correct
+-InfPath "C:\Program Files\config.inf"
+-OutputPath "C:\My Documents\output.json"
+
+# Incorrect
+-InfPath C:\Program Files\config.inf
+```
 
 ---
 
@@ -34,6 +128,47 @@ Complete guide to all parameters and their behaviors for converting INF files to
 | `-MaxFileSizeMB` | Int | 100 | Maximum INF file size in MB |
 | `-MaxSections` | Int | 10000 | Maximum number of sections |
 | `-Force` | Switch | False | Overwrite output without prompting |
+
+---
+
+## Quick Start Examples
+
+### Basic Conversion
+```powershell
+./Convert-InfToJson.ps1 -InfPath config.inf
+```
+Creates `config.json` with automatic type detection.
+
+### With JSONC Comments
+```powershell
+./Convert-InfToJson.ps1 -InfPath config.inf -PreserveComments
+```
+Creates `config.jsonc` with all comments preserved.
+
+### Full Type Conversion
+```powershell
+./Convert-InfToJson.ps1 -InfPath config.inf -YesNoAsBoolean -EmptyAsNull -StripQuotes
+```
+Converts Yes/No to booleans, empty values to null, removes quotes.
+
+### Production Configuration
+```powershell
+./Convert-InfToJson.ps1 `
+    -InfPath synthesys.template.inf `
+    -PreserveComments `
+    -YesNoAsBoolean `
+    -EmptyAsNull `
+    -MaxSections 100 `
+    -StrictMode `
+    -Verbose
+```
+Full-featured conversion with validation and documentation.
+
+### Preview Changes
+```powershell
+./Convert-InfToJson.ps1 -InfPath config.inf -WhatIf -Verbose
+```
+See what would happen without creating files.
 
 ---
 
@@ -921,6 +1056,261 @@ Catch data quality issues early:
 - Added `-Force` with `-WhatIf` support
 - Improved error handling and logging
 - Added return object with statistics
+
+---
+
+## Troubleshooting
+
+### Common Errors and Solutions
+
+#### Error: "Parameter cannot be found"
+
+**Error Message:**
+```
+A parameter cannot be found that matches parameter name 'MaxSections=2'
+```
+
+**Problem:** Using equals sign instead of space for parameter values.
+
+**Solution:**
+```powershell
+# Wrong
+./Convert-InfToJson.ps1 -MaxSections=2
+
+# Correct
+./Convert-InfToJson.ps1 -MaxSections 2
+```
+
+---
+
+#### Error: "Cannot validate argument"
+
+**Error Message:**
+```
+Cannot validate argument on parameter 'MaxSections'. The 0 argument is less than the minimum allowed range of 1.
+```
+
+**Problem:** Parameter value is outside valid range.
+
+**Solution:** Use valid values:
+- `-MaxSections`: minimum 1
+- `-MaxFileSizeMB`: minimum 1
+- `-Depth`: minimum 1
+
+```powershell
+# Wrong
+./Convert-InfToJson.ps1 -MaxSections 0
+
+# Correct
+./Convert-InfToJson.ps1 -MaxSections 1
+```
+
+---
+
+#### Error: "Number of sections exceeds maximum allowed"
+
+**Error Message:**
+```
+Error reading INF file at line 50: Number of sections exceeds maximum allowed (10).
+```
+
+**Problem:** INF file has more sections than the limit allows.
+
+**Solution:** Increase `-MaxSections`:
+```powershell
+./Convert-InfToJson.ps1 -InfPath config.inf -MaxSections 100
+```
+
+---
+
+#### Error: "File size exceeds maximum"
+
+**Error Message:**
+```
+File size (150 MB) exceeds maximum allowed (100 MB)
+```
+
+**Problem:** INF file is larger than size limit.
+
+**Solution:** Increase `-MaxFileSizeMB`:
+```powershell
+./Convert-InfToJson.ps1 -InfPath config.inf -MaxFileSizeMB 200
+```
+
+---
+
+#### Issue: Type Conversions Not Working
+
+**Problem:** Using `-NoTypeConversion` with other type parameters.
+
+**Explanation:** `-NoTypeConversion` overrides all other type conversion parameters.
+
+**Solution:** Remove `-NoTypeConversion` if you want type conversions:
+```powershell
+# This won't convert types (NoTypeConversion wins)
+./Convert-InfToJson.ps1 -InfPath config.inf -NoTypeConversion -YesNoAsBoolean
+
+# This will convert types
+./Convert-InfToJson.ps1 -InfPath config.inf -YesNoAsBoolean
+```
+
+---
+
+#### Issue: Comments Not Preserved
+
+**Problem:** Forgot `-PreserveComments` parameter.
+
+**Solution:** Add `-PreserveComments` to create JSONC output:
+```powershell
+./Convert-InfToJson.ps1 -InfPath config.inf -PreserveComments
+```
+
+**Note:** Only works with `.jsonc` extension (automatically added).
+
+---
+
+#### Issue: File Path Not Found
+
+**Problem:** Path contains spaces without quotes.
+
+**Solution:** Quote paths with spaces:
+```powershell
+# Wrong
+./Convert-InfToJson.ps1 -InfPath C:\Program Files\config.inf
+
+# Correct
+./Convert-InfToJson.ps1 -InfPath "C:\Program Files\config.inf"
+```
+
+---
+
+#### Issue: Output File Not Created in WhatIf Mode
+
+**Problem:** Using `-WhatIf` prevents file creation.
+
+**Explanation:** `-WhatIf` is a preview mode - it shows what would happen without actually creating files.
+
+**Solution:** Remove `-WhatIf` to create the file:
+```powershell
+# Preview only (no file created)
+./Convert-InfToJson.ps1 -InfPath config.inf -WhatIf
+
+# Actually create file
+./Convert-InfToJson.ps1 -InfPath config.inf
+```
+
+---
+
+#### Issue: Warnings About Duplicate Keys
+
+**Warning Message:**
+```
+WARNING: Line 10: Duplicate key 'Setting' in section '[Config]'. Previous value will be overwritten.
+```
+
+**Explanation:** INF file has the same key multiple times in one section. Last value wins.
+
+**Solutions:**
+1. **Fix the source INF file** (recommended)
+2. **Use `-StrictMode`** to treat warnings as errors:
+   ```powershell
+   ./Convert-InfToJson.ps1 -InfPath config.inf -StrictMode
+   ```
+3. **Accept the warning** - script will continue and use last value
+
+---
+
+### Getting Help
+
+#### View All Parameters
+```powershell
+Get-Help ./Convert-InfToJson.ps1 -Full
+```
+
+#### View Examples
+```powershell
+Get-Help ./Convert-InfToJson.ps1 -Examples
+```
+
+#### View Specific Parameter
+```powershell
+Get-Help ./Convert-InfToJson.ps1 -Parameter PreserveComments
+```
+
+#### Enable Verbose Output
+```powershell
+./Convert-InfToJson.ps1 -InfPath config.inf -Verbose
+```
+
+Shows detailed processing information including:
+- Line-by-line parsing
+- Type conversion decisions
+- Comment association
+- Section processing
+
+---
+
+### Best Practices
+
+1. **Test with `-WhatIf` first:**
+   ```powershell
+   ./Convert-InfToJson.ps1 -InfPath config.inf -WhatIf -Verbose
+   ```
+
+2. **Use `-PreserveComments` for configuration files:**
+   - Maintains documentation
+   - Allows easy uncommenting
+   - Creates human-readable output
+
+3. **Enable `-StrictMode` for production:**
+   - Catches data quality issues early
+   - Fails fast on problems
+   - Ensures clean conversions
+
+4. **Set appropriate limits:**
+   - `-MaxSections` based on your needs
+   - `-MaxFileSizeMB` for security
+   - Prevents processing of malformed/malicious files
+
+5. **Use consistent type conversions:**
+   - `-YesNoAsBoolean` for cleaner booleans
+   - `-EmptyAsNull` for database imports
+   - `-StripQuotes` for cleaner strings
+
+6. **Quote paths with spaces:**
+   - Always use quotes for paths containing spaces
+   - Use forward slashes or escaped backslashes on Windows
+
+7. **Use backticks for multi-line commands:**
+   - Improves readability
+   - Easier to maintain
+   - No trailing spaces after backticks
+
+---
+
+### Performance Tips
+
+- **File Size:** Processing is fast for files under 10MB
+- **Section Count:** Performance scales linearly with section count
+- **JSONC Mode:** Adds ~30% overhead for comment processing
+- **Type Conversion:** Minimal overhead (~1-2ms)
+- **Verbose Mode:** Adds minimal overhead, useful for debugging
+
+---
+
+### Support and Documentation
+
+**Files:**
+- This guide: Comprehensive parameter reference
+- Script help: `Get-Help ./Convert-InfToJson.ps1 -Full`
+- Test results: `parameter-test-results.md` (if available)
+
+**Common Use Cases:**
+- Configuration file conversion
+- Template generation with comments
+- Database import preparation
+- CI/CD pipeline integration
+- Legacy system migration
 
 ---
 
