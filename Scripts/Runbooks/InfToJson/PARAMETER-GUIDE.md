@@ -23,11 +23,10 @@ Complete guide to all parameters and their behaviors for converting INF files to
 | `-OutputPath` | String | Auto | Path for output JSON file |
 | `-Encoding` | String | UTF8 | File encoding (UTF8, ASCII, Unicode, etc.) |
 | `-StrictMode` | Switch | False | Treat warnings as errors |
-| `-NoTypeConversion` | Switch | False | Keep all values as strings (legacy) |
+| `-NoTypeConversion` | Switch | False | Disable type conversion, keep all values as strings |
 | `-StripQuotes` | Switch | False | Remove surrounding quotes from values |
 | `-EmptyAsNull` | Switch | False | Convert empty values to JSON null |
 | `-YesNoAsBoolean` | Switch | False | Convert Yes/No to true/false |
-| `-ForceString` | Switch | False | Output all values as strings |
 | `-DefaultSection` | String | _global_ | Section name for keys before first section |
 | `-Depth` | Int | 10 | Maximum JSON depth |
 | `-MaxFileSizeMB` | Int | 100 | Maximum INF file size in MB |
@@ -76,11 +75,22 @@ Empty=
 
 ### `-NoTypeConversion`
 
-Disables all automatic type detection. All values become strings.
+**Most Powerful Override** - Disables all automatic type detection. All values remain as strings, overriding all other type conversion parameters.
 
 **Example:**
 ```powershell
 .\Convert-InfToJson.ps1 -InfPath config.inf -NoTypeConversion
+```
+
+**INF Input:**
+```ini
+[Config]
+Name=MyApp
+Version=2.5
+Enabled=true
+Port=8080
+Setting=Yes
+Empty=
 ```
 
 **Output:**
@@ -88,33 +98,6 @@ Disables all automatic type detection. All values become strings.
 {
   "Config": {
     "Name": "MyApp",
-    "Version": "2.5",
-    "Enabled": "true",
-    "Port": "8080"
-  }
-}
-```
-
-**Use When:**
-- You need exact string preservation
-- Consuming system expects strings
-- You want to avoid any type interpretation
-
----
-
-### `-ForceString`
-
-**Most Powerful Override** - Forces ALL values to be strings, overriding all other type conversion parameters.
-
-**Example:**
-```powershell
-.\Convert-InfToJson.ps1 -InfPath config.inf -ForceString
-```
-
-**Output:**
-```json
-{
-  "Config": {
     "Version": "2.5",
     "Enabled": "true",
     "Port": "8080",
@@ -128,11 +111,14 @@ Disables all automatic type detection. All values become strings.
 - Overrides `-YesNoAsBoolean`, `-EmptyAsNull`, and default type conversion
 - Empty values remain as empty strings `""`
 - Most conservative option for maximum compatibility
+- Everything stays exactly as it appears in the INF file
 
 **Use When:**
 - Legacy systems require string values
 - You want predictable, uniform types
-- Avoiding type conversion issues
+- You need exact string preservation
+- Consuming system expects all strings
+- Avoiding any type interpretation issues
 
 ---
 
@@ -459,7 +445,7 @@ Maximum depth for JSON conversion.
 **Goal:** Ensure all values are strings for legacy system compatibility.
 
 ```powershell
-.\Convert-InfToJson.ps1 -InfPath config.inf -ForceString
+.\Convert-InfToJson.ps1 -InfPath config.inf -NoTypeConversion
 ```
 
 **Result:** Everything is a string, no type conversion.
@@ -522,37 +508,29 @@ Maximum depth for JSON conversion.
 
 ### Priority Order (What Overrides What)
 
-1. **`-ForceString`** - Overrides EVERYTHING (most powerful)
-2. **`-NoTypeConversion`** - Disables type detection
-3. **`-EmptyAsNull`** - Converts empty to null
-4. **`-YesNoAsBoolean`** - Converts Yes/No to boolean
-5. **Default type conversion** - Numbers, true/false
+1. **`-NoTypeConversion`** - Overrides EVERYTHING (most powerful) - all values become strings
+2. **`-EmptyAsNull`** - Converts empty to null
+3. **`-YesNoAsBoolean`** - Converts Yes/No to boolean
+4. **Default type conversion** - Numbers, true/false
 
 ### Valid Combinations
 
 | Combination | Result |
 |-------------|--------|
-| `-ForceString` + anything | All strings (ForceString wins) |
+| `-NoTypeConversion` + anything | All strings (NoTypeConversion wins) |
 | `-YesNoAsBoolean` + `-EmptyAsNull` | ✅ Both work together |
-| `-NoTypeConversion` + `-YesNoAsBoolean` | ⚠️ NoTypeConversion wins |
-| `-NoTypeConversion` + `-EmptyAsNull` | ⚠️ NoTypeConversion wins |
 | `-StripQuotes` + any conversion | ✅ Works together |
 
 ### Conflicting Parameters
 
-**⚠️ `-ForceString` vs. Others**
+**⚠️ `-NoTypeConversion` vs. Type Parameters**
 ```powershell
-# ForceString overrides everything
-.\Convert-InfToJson.ps1 -InfPath config.inf -ForceString -YesNoAsBoolean -EmptyAsNull
+# NoTypeConversion overrides everything
+.\Convert-InfToJson.ps1 -InfPath config.inf -NoTypeConversion -YesNoAsBoolean -EmptyAsNull
 # Result: All strings (YesNoAsBoolean and EmptyAsNull ignored)
 ```
 
-**⚠️ `-NoTypeConversion` vs. Type Parameters**
-```powershell
-# NoTypeConversion disables type detection
-.\Convert-InfToJson.ps1 -InfPath config.inf -NoTypeConversion -YesNoAsBoolean
-# Result: All strings (YesNoAsBoolean ignored)
-```
+**Why:** `-NoTypeConversion` is designed for maximum compatibility when you need all values as strings, so it takes precedence over all type conversion options.
 
 ---
 
@@ -601,8 +579,8 @@ Preview changes before committing:
 ### 4. Combine Parameters Thoughtfully
 Don't use conflicting parameters:
 ```powershell
-# ❌ Bad: ForceString makes YesNoAsBoolean useless
-.\Convert-InfToJson.ps1 -InfPath config.inf -ForceString -YesNoAsBoolean
+# ❌ Bad: NoTypeConversion makes YesNoAsBoolean useless
+.\Convert-InfToJson.ps1 -InfPath config.inf -NoTypeConversion -YesNoAsBoolean
 
 # ✅ Good: These work together
 .\Convert-InfToJson.ps1 -InfPath config.inf -YesNoAsBoolean -EmptyAsNull
@@ -625,7 +603,7 @@ Catch data quality issues early:
 
 ### Legacy System Integration
 ```powershell
-.\Convert-InfToJson.ps1 -InfPath legacy.inf -ForceString -Force
+.\Convert-InfToJson.ps1 -InfPath legacy.inf -NoTypeConversion -Force
 ```
 
 ### Database Seeding
@@ -647,10 +625,6 @@ Catch data quality issues early:
 
 ## Troubleshooting
 
-### "Method invocation failed" Error
-**Cause:** Using `-EmptyAsNull` in older version  
-**Solution:** Update to latest version with null handling fix
-
 ### Warnings about Duplicate Keys
 **Cause:** INF file has duplicate keys in same section  
 **Solution:** Use `-StrictMode` to fail, or fix INF file
@@ -671,11 +645,12 @@ Catch data quality issues early:
 ## Version History
 
 **v2.1** - Current
-- Added `-ForceString` parameter
 - Added `-YesNoAsBoolean` parameter
 - Added `-EmptyAsNull` parameter
+- Clarified `-NoTypeConversion` behavior and priority
 - Fixed null handling in verbose logging
 - Improved type conversion logic
+- Added order preservation for sections and keys
 
 **v2.0**
 - Added comprehensive security validation
