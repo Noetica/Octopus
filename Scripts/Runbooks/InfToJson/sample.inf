@@ -1,0 +1,156 @@
+; Sample INF Configuration File
+; This file demonstrates various features and edge cases
+
+; Global settings (before any section)
+globalSetting=This is a global value
+globalNumber=42
+
+[Application]
+name=MyApplication
+version=2.5.1
+enabled=true
+disabled=false
+port=8080
+timeout=30.5
+maxRetries=3
+
+[Database]
+host=localhost
+port=5432
+database=mydb
+username=admin
+maxConnections=100
+connectionTimeout=45.5
+useSSL=true
+poolSize=20
+
+[Paths]
+; Note: Semicolons in paths are NOT treated as comments
+installPath=C:\Program Files\MyApp
+dataPath=C:\ProgramData\MyApp\Data
+logPath=C:\ProgramData\MyApp\Logs
+multiplePaths=C:\Path1;C:\Path2;C:\Path3
+tempPath=C:\Temp
+
+[Features]
+useCache=true
+enableDebug=false
+logLevel=2
+cacheSize=1024
+compressionEnabled=true
+encryptionEnabled=true
+
+[Numbers]
+; Integer tests
+zero=0
+negativeZero=-0
+positive=12345
+negative=-9876
+ten=10
+twenty=20
+hundred=100
+thousand=1000
+
+; Decimal tests
+pi=3.14159
+negativeDecimal=-2.5
+smallDecimal=0.001
+largeDecimal=999999.999999
+
+; Large numbers
+largeInt=9223372036854775807
+veryLargeInt=99999999999999999999
+
+[Strings]
+simple=Hello World
+withSpaces=  This has spaces
+withComma=value1,value2,value3
+trailingComma=value1,value2,value3,
+withEquals=key=value&another=value2
+description=This is a longer description with multiple words
+
+[LeadingZeros]
+; These should remain as strings
+zipCode=01234
+octalPermission=0755
+paddedNumber=007
+phoneNumber=00441234567890
+
+[Quoted]
+; Testing quoted values
+singleQuoted='This is single quoted'
+doubleQuoted="This is double quoted"
+notQuoted=This is not quoted
+mixedQuotes="Don't remove these"
+
+[Unicode]
+; Unicode character support
+greeting=Hello 世界
+emoji=🎉 Celebration 🎊
+french=Café au lait
+spanish=Mañana, señor
+german=Übermensch
+russian=Привет
+
+[SpecialCharacters]
+brackets=[Some Value]
+braces={Some Value}
+parentheses=(Some Value)
+symbols=@#$%^&*()
+underscores=value_with_under_scores
+hyphens=value-with-hyphens
+periods=value.with.periods
+
+[URLs]
+website=https://example.com
+apiEndpoint=https://api.example.com/v1/users
+withParams=https://example.com?param1=value1&param2=value2
+withSemicolon=https://example.com;jsessionid=12345
+
+[Booleans]
+; Case insensitive boolean values
+lower_true=true
+lower_false=false
+upper_true=TRUE
+upper_false=FALSE
+mixed_true=TrUe
+mixed_false=FaLsE
+
+[EdgeCases]
+empty=
+justSpaces=
+multipleEquals=a=b=c=d
+colonValue=key:value
+pipeValue=value1|value2|value3
+atSymbol=user@domain.com
+hashTag=#hashtag
+
+[DuplicateTest]
+; Testing duplicate key handling (last one wins)
+duplicateKey=firstValue
+duplicateKey=secondValue
+duplicateKey=finalValue
+
+[ConnectionStrings]
+sqlServer=Server=localhost;Database=TestDB;User Id=sa;Password=P@ssw0rd;
+postgres=Host=localhost;Port=5432;Database=mydb;Username=admin;Password=secret;
+mongodb=mongodb://username:password@localhost:27017/database
+
+[JSONLike]
+; These look like JSON but are just strings
+arrayLike=[1, 2, 3, 4, 5]
+objectLike={"key": "value", "number": 123}
+nestedLike=[{"id": 1}, {"id": 2}]
+
+[Comments]
+; Full line comments are ignored
+value1=test1
+# Hash comments are also ignored
+value2=test2
+; Multiple
+; Comment
+; Lines
+value3=test3
+
+[EmptySection]
+; This section intentionally left empty (after this comment)
