@@ -36,6 +36,13 @@
     When enabled, preserves comments from INF file as JSONC (JSON with Comments).
     Output will be .jsonc format with // style comments.
 
+    Intelligently converts commented INF syntax to JSON syntax:
+    - Commented key=value pairs become: // "key": "value",
+    - Commented sections become: // "SectionName": { ... }
+    - Regular comments are preserved as-is
+
+    This allows comments to be uncommented and become valid JSON immediately.
+
 .PARAMETER DefaultSection
     Name for the section to use for key-value pairs found before any section header.
     Default: "_global_"
@@ -78,7 +85,9 @@
 
 .EXAMPLE
     .\Convert-InfToJson.ps1 -InfPath "C:\config\app.inf" -PreserveComments
-    Creates C:\config\app.jsonc with comments preserved from the INF file
+    Creates C:\config\app.jsonc with comments preserved from the INF file.
+    Commented INF syntax is converted to JSON format for easy uncommenting:
+    ; Server=localhost becomes // "Server": "localhost",
 
 .NOTES
     Author: Enhanced by code review
@@ -273,6 +282,72 @@ function Test-DirectoryWritable {
     } catch {
         throw "Cannot write to directory '$DirectoryPath': $_"
     }
+}
+
+function ConvertTo-JsonComment {
+    <#
+    .SYNOPSIS
+        Converts INF syntax in comments to JSON syntax for better uncommentability.
+
+    .DESCRIPTION
+        Detects if a comment contains INF syntax (key=value or [section]) and converts
+        it to proper JSON syntax so that uncommenting produces valid JSON.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CommentText,
+
+        [Parameter(Mandatory = $false)]
+        [string]$CurrentSection
+    )
+
+    $trimmed = $CommentText.Trim()
+
+    # Check if it's a section header: [SectionName]
+    if ($trimmed -match '^\[([^\[\]\r\n\t]+)\]$') {
+        $sectionName = $matches[1].Trim()
+        # Escape the section name for JSON
+        $escapedName = $sectionName -replace '\\', '\\' -replace '"', '\"'
+        # Note: We don't add closing brace as it would be on a separate comment line
+        # Users will need to uncomment both the opening and add a closing brace manually
+        return "`"$escapedName`": { ... }"
+    }
+
+    # Check if it's a key=value pair
+    if ($trimmed -match '^([A-Za-z0-9_\-\.\s]+?)\s*=\s*(.*)$') {
+        $key = $matches[1].Trim()
+        $rawValue = $matches[2].Trim()
+
+        # Remove trailing commas
+        $rawValue = $rawValue.TrimEnd(',').Trim()
+
+        # Convert the value using the same logic as the main parser
+        $typedValue = ConvertTo-TypedValue -Value $rawValue
+
+        # Escape key for JSON
+        $escapedKey = $key -replace '\\', '\\' -replace '"', '\"'
+
+        # Convert typed value to JSON representation
+        if ($null -eq $typedValue) {
+            $jsonValue = "null"
+        }
+        elseif ($typedValue -is [bool]) {
+            $jsonValue = $typedValue.ToString().ToLower()
+        }
+        elseif ($typedValue -is [int] -or $typedValue -is [long] -or $typedValue -is [double]) {
+            $jsonValue = $typedValue.ToString()
+        }
+        else {
+            # String - escape special characters
+            $escaped = $typedValue -replace '\\', '\\' -replace '"', '\"' -replace "`n", '\n' -replace "`r", '\r' -replace "`t", '\t'
+            $jsonValue = "`"$escaped`""
+        }
+
+        return "`"$escapedKey`": $jsonValue,"
+    }
+
+    # Not INF syntax, return as-is (plain comment)
+    return $CommentText
 }
 
 function ConvertTo-JSONC {
@@ -524,8 +599,11 @@ try {
             if ($PreserveComments) {
                 # Remove comment prefix and store
                 $commentText = $line -replace '^[;#]\s*', '' -replace '^//\s*', ''
-                $pendingComments += $commentText
-                Write-Verbose "Line ${lineNumber}: Captured comment: $commentText"
+
+                # Convert INF syntax in comments to JSON syntax
+                $jsonComment = ConvertTo-JsonComment -CommentText $commentText -CurrentSection $section
+                $pendingComments += $jsonComment
+                Write-Verbose "Line ${lineNumber}: Captured comment: $jsonComment"
             }
             return
         }
