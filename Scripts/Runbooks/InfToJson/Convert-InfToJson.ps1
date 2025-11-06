@@ -284,7 +284,7 @@ function ConvertTo-JSONC {
         [hashtable]$Comments = @{},
 
         [Parameter(Mandatory = $false)]
-        [hashtable]$SectionComments = @{},
+        $SectionComments = @{},
 
         [Parameter(Mandatory = $false)]
         [int]$Depth = 10,
@@ -309,18 +309,19 @@ function ConvertTo-JSONC {
         $sectionIndex++
         $isLastSection = ($sectionIndex -eq $sectionCount)
 
-        # Add section comments
-        if ($SectionComments.ContainsKey($sectionKey)) {
-            foreach ($comment in $SectionComments[$sectionKey]) {
-                $lines += "$nextIndent// $comment"
-            }
-        }
-
         $sectionValue = $Data[$sectionKey]
 
         # Handle array sections
         if ($sectionValue -is [array]) {
             $lines += "$nextIndent`"$sectionKey`": ["
+
+            # Add section comments inside array
+            if ($SectionComments.Contains($sectionKey)) {
+                foreach ($comment in $SectionComments[$sectionKey]) {
+                    $lines += "    $nextIndent// $comment"
+                }
+            }
+
             for ($i = 0; $i -lt $sectionValue.Count; $i++) {
                 $item = $sectionValue[$i]
                 $isLast = ($i -eq $sectionValue.Count - 1)
@@ -334,6 +335,13 @@ function ConvertTo-JSONC {
         # Handle object sections
         elseif ($sectionValue -is [System.Collections.Specialized.OrderedDictionary] -or $sectionValue -is [hashtable]) {
             $lines += "$nextIndent`"$sectionKey`": {"
+
+            # Add section comments inside object (at the top)
+            if ($SectionComments.Contains($sectionKey)) {
+                foreach ($comment in $SectionComments[$sectionKey]) {
+                    $lines += "    $nextIndent// $comment"
+                }
+            }
 
             $keyIndex = 0
             $keyCount = $sectionValue.Keys.Count
@@ -538,6 +546,29 @@ try {
                 throw "Number of sections exceeds maximum allowed ($MaxSections). Consider increasing -MaxSections parameter."
             }
 
+            # Before opening new section, assign any pending comments to the PREVIOUS section
+            # If this is the first section, pending comments will be assigned to it instead
+            if ($PreserveComments -and $pendingComments.Count -gt 0) {
+                if ($section) {
+                    # Assign to previous section
+                    if (-not $sectionComments.Contains($section)) {
+                        $sectionComments[$section] = @()
+                    }
+                    # Append to existing section comments
+                    $sectionComments[$section] += $pendingComments
+                    Write-Verbose "Assigned $($pendingComments.Count) comment(s) to previous section [$section]"
+                    $pendingComments = @()
+                } else {
+                    # This is the first section, assign comments to it
+                    if (-not $sectionComments.Contains($sectionName)) {
+                        $sectionComments[$sectionName] = @()
+                    }
+                    $sectionComments[$sectionName] += $pendingComments
+                    Write-Verbose "Assigned $($pendingComments.Count) comment(s) to first section [$sectionName]"
+                    $pendingComments = @()
+                }
+            }
+
             # Check for duplicate section
             if ($result.Contains($sectionName)) {
                 Write-ScriptWarning "Line ${lineNumber}: Duplicate section '[$sectionName]' found. Values will be merged."
@@ -548,13 +579,6 @@ try {
 
             $section = $sectionName
             Write-Verbose "Line ${lineNumber}: Found section [$sectionName]"
-
-            # Store pending comments for this section
-            if ($PreserveComments -and $pendingComments.Count -gt 0) {
-                $sectionComments[$sectionName] = $pendingComments
-                $pendingComments = @()
-                Write-Verbose "Assigned $($sectionComments[$sectionName].Count) comment(s) to section [$sectionName]"
-            }
 
             # Initialize tracking for this section
             if (-not $sectionArrayItems.Contains($sectionName)) {
@@ -650,6 +674,17 @@ try {
 # Check if we encountered any errors in strict mode
 if ($StrictMode -and $script:HasErrors) {
     throw "Processing failed due to errors (StrictMode enabled)"
+}
+
+# Handle any remaining pending comments - assign to last section
+if ($PreserveComments -and $pendingComments.Count -gt 0 -and $section) {
+    if (-not $sectionComments.Contains($section)) {
+        $sectionComments[$section] = @()
+    }
+    # Append to existing section comments
+    $sectionComments[$section] += $pendingComments
+    Write-Verbose "Assigned $($pendingComments.Count) trailing comment(s) to section [$section]"
+    $pendingComments = @()
 }
 
 # Process sections with array items

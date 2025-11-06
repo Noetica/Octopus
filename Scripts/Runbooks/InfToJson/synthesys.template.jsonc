@@ -19,17 +19,17 @@
       "LINK_RESPONSE_TIMEOUT": 60
   },
   "DB": {
-      "DBName": "sqldb-contoso-noetica-dev-uksouth",
-      "DBPhoneyxName": "sqldb-contoso-noetica-dev-uksouth",
-      "DBAdminName": "sqldb-contoso-noetica-dev-uksouth",
-      "DBMainName": "sqldb-contoso-noetica-dev-uksouth",
-      "DBTenantName": "sqldb-contoso-noetica-dev-uksouth",
+      "DBName": "Phoenix",
+      "DBPhoneyxName": "Phoenix",
       "Supplier": "Microsoft SQL Server 7.0",
       "UID": "Synthesys",
       "PWD": "Protection1066!",
-      "DBServer": "talkdesksql.database.windows.net"
+      "DBServer": "TALKDESKDEV",
+      // BulkInsertPath=\\DBServer\CallloggerDir
+      "DBAdminName": "Phoenix",
+      "DBMainName": "Phoenix",
+      "DBTenantName": "Phoenix"
   },
-  // BulkInsertPath=\\DBServer\CallloggerDir
   "CallLogger": {
       // InsertMethod=BulkClass
       // InsertMethod=BulkFiles
@@ -54,19 +54,41 @@
       "Currency_DataType": "NUMERIC(19,4)",
       "Other_Settings": "SET QUOTED_IDENTIFIER ON;SET LOCK_TIMEOUT 5000;SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;",
       "ODBC_Driver": "SQL Server",
-      "ODBC_Phoenix_Settings": "AnsiNPW=No|Description=Synthesys Phoenix Database|Database=sqldb-contoso-noetica-dev-uksouth|LastUser=Synthesys|SERVER=sql-noetica-dev-uksouth.database.windows.net",
-      "ODBC_Phoneyx_Settings": "AnsiNPW=No|Description=Synthesys Phoneyx Database|Database=sqldb-contoso-noetica-dev-uksouth|LastUser=Synthesys|SERVER=sql-noetica-dev-uksouth.database.windows.net",
+      "ODBC_Phoenix_Settings": "AnsiNPW=No|Description=Synthesys Phoenix Database|Database=Phoenix|LastUser=Synthesys|SERVER=TALKDESKDEV",
+      "ODBC_Phoneyx_Settings": "AnsiNPW=No|Description=Synthesys Phoneyx Database|Database=Phoenix|LastUser=Synthesys|SERVER=TALKDESKDEV",
       "DropColumn": "ALTER TABLE \"%s\" DROP COLUMN \"%s\"",
       "MaxTableNameLen": 30,
       "MaxColumnNameLen": 30,
       "AlterColumn": "ALTER TABLE \"%s\" ALTER COLUMN %s;"
   },
   "System Services": [
+      // LicenceService.exe,LicenceService,Controls the licensing of the Synthesys software,92
+      // CTIService.exe,CTI Service,Logs all Call Telephony Integration between telephone switch + Synthesys workstations,90
+      // PhSeqMgr.exe,Sequence Service,Services all requests from the Call Tracker + adds events into the event table,80
+      // PredictiveDialler.exe,PredictiveDialler,Delivers all Outbound Calls,50
+      // ScriptTracker.exe,ScriptTracker Service,Helps to speed up screen popping and script opening in 'Take Calls',40
+      // wcfhost.exe /wcfhost:OutboundWebServiceEngine.dll /ServiceName:"Outbound Web Service",Outbound Web Service,Outbound Web Service,40
+      // wcfhost.exe /wcfhost:CampaignManagerEngine.dll /ServiceName:"Campaign Manager Engine",Campaign Manager Engine,Campaign Manager Engine,40
+      // StartNubCampaignManager.bat,Campaign Manager Engine,Campaign Manager Engine,40
+      // wcfhost.exe /wcfhost:NewRecycling.dll /ServiceName:"New Recycling Service",New Recycling Service,New Recycling Service,40
+      // wcfhost.exe /wcfhost:Synthesys.SQI.SqiServiceEngine.dll /ServiceName:"SQI Service Engine",SQI Service Engine,SQI Service Engine (New),40
+      // StartNubSQI.bat,SQI Service Engine,SQI Service Engine (New),40
+      // StartAgentAPI.bat,AgentAPI,AgentAPI,40
+      // StartUserManagementAPI.bat,UserManagementAPI,UserManagementAPI,40
+      // OBMessageService.exe,Outbound Message Service,Outbound campaign message service,40
+      // wcfhost.exe /wcfhost:GetFilterSqlService.dll /ServiceName:"Get Filter Sql Service",Get Filter Sql Service,Get Filter Sql Service,40
+      // StartNubGetFilterSQL.bat,Get Filter Sql Service,Get Filter Sql Service,40
+      // wcfhost.exe /wcfhost:EntityImportService.dll /ServiceName:"Entity Import Service",Entity Import Service,Entity Import Service,40
+      // StartNubEntityImport.bat,Entity Import Service,Entity Import Service,40
+      // StartNoeSettingsAPI.bat,NoeSettingsAPI,Provides Customisation / Import / Export / Persistence of Dashboard profiles,30
+      // StartNubDnc.bat,DncAPI,Dnc API,30
+      // StartCampaignAPI.bat,CampaignAPI,CampaignAPI,30
       "Spider.exe,Spider,Processes all rpc communication between Synthesys services + Synthesys clients,100",
       "EventLogService.exe,Event Service,Controls all Event/Error logs sent round the Synthesys,98",
       "EventLogger.exe,EventLogger,Inserts eventlog messages into appropriate event log file,96",
       "Queue Manager.exe,Queue Manager Service,Controls all outbound customers in the O/B queue and queues calls,70",
       "CRM_ServiceMT.exe,Customer Service,Handles all CRM requests,50",
+      "HouseKeeper.exe,HouseKeeper,Maintain the Synthesys software on the server,45",
       "TokenServer.exe,TokenServer,Ensures that only one Queue Operation from OBManager is running at once,40",
       "PacketSender.exe,Packet Sender,Handles all files and requests for the Queue Manager,50",
       "CallLogger.exe,CallLogger,Populates the Phoenix_Statistics table with all calls and CTI actions,40",
@@ -77,12 +99,13 @@
       "sqm_service.exe,SQM Service,Runs the Synthesys Queue Monitor,50",
       "GSCSchedulerService.exe,GSCScheduler Service,Global State Change service,40",
       "BulkOBService.exe,Synthesys Bulk SMS Service,Handles all bulk SMS requests,40",
+      "RepStart.exe,Report Starter Service,Calculates all report schedules,50",
       "HTMLEmailService.exe,HTML Email Service,Send html reports scheduled in campaign manager,50",
       "wcfhost.exe /wcfhost:Synthesys.CRM.CRMWebServiceEngine.dll /ServiceName:\"CRM Web Service\",CRM Web Service, CRM Web Service, 40",
       "wcfhost.exe /wcfhost:Synthesys.Dialler.DiallerWebService.dll /ServiceName:\"Dialler Web Service\",Dialler Web Service,Dialler Web Service, 40",
       "WebSynStatsService.exe,WebSynStatsService,Provides LM Statistics,30",
       "wcfhost.exe /wcfhost:PropertiesEditorService.dll /ServiceName:\"Properties Editor Service\",Properties Editor Service,Properties Editor Service,40",
-      "WCFHostNVP.exe /wcfhost:LPDWebServiceEngine.dll /ServiceName:\"LPDWebServiceEngine\",LPDWebServiceEngine,LPDWebServiceEngine, 40",
+      "wcfhost.exe /wcfhost:ListFilterService.dll /ServiceName:\"List Filter Service\",List Filter Service,List Filter Service,40",
       "StartCampaignAPI.bat,CampaignAPI,CampaignAPI,40",
       "StartCustomerAPI.bat,CustomerAPI,CustomerAPI,40",
       "StartDiallerAPI.bat,DiallerAPI,DiallerAPI,40",
@@ -109,66 +132,40 @@
       "StartAudioAPI.bat,AudioAPI,AudioAPI,40",
       "StartCallPlayerAPI.bat,CallPlayerAPI,CallPlayerAPI,40",
       "StartRouteManagerAPI.bat,RouteManagerAPI,RouteManagerAPI,40",
-      "StartReportsAPI.bat,ReportsAPI,ReportsAPI,30",
-      "StartDncAPI.bat,DncAPI,DncAPI,30",
-      "StartCampaignManagerEngine.bat,CampaignManagerEngine,CampaignManagerEngine,30",
+      "StartReportsAPI.bat,ReportsAPI,ReportsAPI,40",
+      "StartPriorityColumnUpdaterSvc.bat,PriorityColumnUpdaterSvc,PriorityColumnUpdaterSvc,30",
       "StartAgentAPI.bat,AgentAPI,AgentAPI,30",
-      "StartSkillProcessAPI.bat,SkillProcessAPI,SkillProcessAPI,30",
-      "StartCampaignAPI.bat,CampaignAPI,CampaignAPI,30",
-      "StartLicenceAPI.bat,LicenceAPI,LicenceAPI,30",
+      "StartCampaignManagerEngine.bat,CampaignManagerEngine,CampaignManagerEngine,30",
+      "StartCustomerAPI.bat,CustomerAPI,CustomerAPI,30",
+      "StartDashboardAPI.bat,DashboardAPI,DashboardAPI,30",
+      "StartDncAPI.bat,DncAPI,DncAPI,30",
+      "StartEventLoggerAPI.bat,EventLoggerAPI,EventLoggerAPI,30",
+      "StartReportsAPI.bat,ReportsAPI,ReportsAPI,30",
       "StartSkillAPI.bat,SkillAPI,SkillAPI,30",
       "StartTeamAPI.bat,TeamAPI,TeamAPI,30",
-      "StartUserManagementAPI.bat,UserManagementAPI,UserManagementAPI,30",
-      "StartDashboardAPI.bat,DashboardAPI,DashboardAPI,30",
-      "StartCustomerAPI.bat,CustomerAPI,CustomerAPI,30",
       "StartTelephonyAPI.bat,TelephonyAPI,TelephonyAPI,30",
       "StartEntityImportService.bat,EntityImportService,EntityImportService,30",
-      "StartSQIServiceEngine.bat,SQIServiceEngine,SQIServiceEngine,30",
       "StartGetFilterSqlService.bat,GetFilterSqlService,GetFilterSqlService,30",
-      "StartEventLoggerAPI.bat,EventLoggerAPI,EventLoggerAPI,30",
+      "StartSQIServiceEngine.bat,SQIServiceEngine,SQIServiceEngine,30",
+      "StartUserManagementAPI.bat,UserManagementAPI,UserManagementAPI,30",
       "StartQueueAPI.bat,QueueAPI,QueueAPI,30",
-      "StartPredictiveDialler.bat,PredictiveDialler,PredictiveDialler,30",
-      "StartOBMessageService.bat,Outbound Message Service,Outbound Message Service,30",
-      "StartNewRecyclingService.bat,NewRecyclingService,NewRecyclingService,30",
       "StartWorkspaceAPI.bat,WorkspaceAPI,WorkspaceAPI,30",
-      "StartOBMessageHook.bat,OBMessageHook,OBMessageHook,30",
+      "StartNewRecyclingService.bat,NewRecyclingService,NewRecyclingService,30",
+      "StartPredictiveDialler.bat,PredictiveDialler,PredictiveDialler,30",
       "StartOBMessageService.bat,OBMessageService,OBMessageService,30",
-      "StartPriorityColumnUpdaterSvc.bat,PriorityColumnUpdaterSvc,PriorityColumnUpdaterSvc,30",
-      "StartListFilterService.bat,ListFilterService,ListFilterService,30",
-      "StartHouseCleaner.bat,HouseCleaner,HouseCleaner,30",
-      "StartReportStarter.bat,ReportStarter,ReportStarter,30"
+      "StartOBMessageHook.bat,OBMessageHook,OBMessageHook,30"
   ],
-  // LicenceService.exe,LicenceService,Controls the licensing of the Synthesys software,92
-  // CTIService.exe,CTI Service,Logs all Call Telephony Integration between telephone switch + Synthesys workstations,90
-  // PhSeqMgr.exe,Sequence Service,Services all requests from the Call Tracker + adds events into the event table,80
-  // HouseKeeper.exe,HouseKeeper,Maintain the Synthesys software on the server,45
-  // PredictiveDialler.exe,PredictiveDialler,Delivers all Outbound Calls,50
-  // RepStart.exe,Report Starter Service,Calculates all report schedules,50
-  // ScriptTracker.exe,ScriptTracker Service,Helps to speed up screen popping and script opening in 'Take Calls',40
-  // wcfhost.exe /wcfhost:OutboundWebServiceEngine.dll /ServiceName:"Outbound Web Service",Outbound Web Service,Outbound Web Service,40
-  // wcfhost.exe /wcfhost:CampaignManagerEngine.dll /ServiceName:"Campaign Manager Engine",Campaign Manager Engine,Campaign Manager Engine,40
-  // StartNubCampaignManager.bat,Campaign Manager Engine,Campaign Manager Engine Display,40
-  // wcfhost.exe /wcfhost:NewRecycling.dll /ServiceName:"New Recycling Service",New Recycling Service,New Recycling Service,40
-  // wcfhost.exe /wcfhost:Synthesys.SQI.SqiServiceEngine.dll /ServiceName:"SQI Service Engine",SQI Service Engine,SQI Service Engine (New),40
-  // wcfhost.exe /wcfhost:ListFilterService.dll /ServiceName:"List Filter Service",List Filter Service,List Filter Service,40
-  // StartAgentAPI.bat,AgentAPI,AgentAPI,40
-  // StartUserManagementAPI.bat,UserManagementAPI,UserManagementAPI,40
-  // OBMessageService.exe,Outbound Message Service,Outbound campaign message service,40
-  // wcfhost.exe /wcfhost:GetFilterSqlService.dll /ServiceName:"Get Filter Sql Service",Get Filter Sql Service,Get Filter Sql Service,40
-  // wcfhost.exe /wcfhost:EntityImportService.dll /ServiceName:"Entity Import Service",Entity Import Service,Entity Import Service,40
-  // StartNoeSettingsAPI.bat,NoeSettingsAPI,Provides Customisation / Import / Export / Persistence of Dashboard profiles,30
-  // OneComWebHook.exe,OneComWebHook,OneComWebHook,30
-  // Start.bat,,,30
-  // StartVoicePlatformDSP.bat,VoicePlatformDSP,VoicePlatformDSP,30
   "Impromptu Service": {
+      // WaitForExportFileSecs=120
+      // MaxExportFileSize=1024
       // Location of Impadmin.exe on machine running Impromptu Service
       "Executable": "D:\\Cognos\\impromptu\\ImpAdmin.exe",
       "Impromptu Timeout": 120,
       "Local TIF Filename": "E:\\Synthesys\\Spool\\Synth.tif"
   },
-  // WaitForExportFileSecs=120
-  // MaxExportFileSize=1024
   "HouseKeeper": {
+      // DBTimeout=15
+      // DeleteSpamFilePeriod=1
       "RunType": "daily",
       "Mins": 0,
       "Time": "03:40",
@@ -205,7 +202,7 @@
       "DeleteLicenseUsePeriod": 12,
       "RunningCallChangeState": true,
       "RunningCallChangeStateThreshold": 1,
-      "RunningCallChangeStateTo": "Queued",
+      "RunningCallChangeStateTo": "Attention",
       "DeleteStatisticsDialOnly": false,
       "DeleteStatisticsLimit": 0,
       "DeleteStatisticsChunkSize": 10000,
@@ -220,20 +217,24 @@
       "CleanPhoenixDoNotCall": true,
       "CleanPhoenixDoNotCallThreshold": 30
   },
-  // DBTimeout=15
-  // DeleteSpamFilePeriod=1
   "E-mail Service": {
+      // Name of the SMTP server
+      // SMTP Server=Eagle
+      // SMTP Server timeout=10
+      // BACKUP SMTP Server=81.195.201.2
+      // BACKUP SMTP Server timeout=100
+      // SMTP Server=mail.yourofficeanywhere.co.uk
+      // Auth=
+      // Username=sasha
+      // Password=
   },
-  // Name of the SMTP server
-  // SMTP Server=Eagle
-  // SMTP Server timeout=10
-  // BACKUP SMTP Server=81.195.201.2
-  // BACKUP SMTP Server timeout=100
-  // SMTP Server=mail.yourofficeanywhere.co.uk
-  // Auth=
-  // Username=sasha
-  // Password=
   "LOGON": {
+      // groups:
+      // Administrator, Agent, Supervisor, Executive, Programmer, Account Manager
+      // AGENT_MODE=ENABLED
+      // MULTISWITCH EXAMPLE
+      // FIELD0=Extension;EDIT;UNIQUE,SECRET
+      // FIELD1=CTI;COMBO(DATA:OtherSystem,SynthesysSwitch,1);SELECTONLY
       // possible options are WINDOWSINTEGRATED,TIMEOUTLOGOUT,USERUNIQUE and AUTOLOGON
       // given in a comma separated list
       // SINGLE SWITCH EXAMPLE
@@ -257,21 +258,19 @@
       // FIELD7=NAME;COMBO
       "NO_SYSTEM_MENU": "Executive,Agent"
   },
-  // groups:
-  // Administrator, Agent, Supervisor, Executive, Programmer, Account Manager
-  // AGENT_MODE=ENABLED
-  // MULTISWITCH EXAMPLE
-  // FIELD0=Extension;EDIT;UNIQUE,SECRET
-  // FIELD1=CTI;COMBO(DATA:OtherSystem,SynthesysSwitch,1);SELECTONLY
   "Interfaces": {
+      // INTERFACE0=MOTDClient.exe, Message of the Day, KILL
+      // INTERFACE1=CTIClient.exe, CTIClient, KILL
+      // INTERFACE2=Pinger.exe,Pinger,KILL
+      // SINGLE SWITCH EXAMPLE
+      // Interface0=MOTDClient.exe, Message of the Day, KILL
+      // Interface1=CTIClient.exe,CTIClient,KILL
   },
-  // INTERFACE0=MOTDClient.exe, Message of the Day, KILL
-  // INTERFACE1=CTIClient.exe, CTIClient, KILL
-  // INTERFACE2=Pinger.exe,Pinger,KILL
-  // SINGLE SWITCH EXAMPLE
-  // Interface0=MOTDClient.exe, Message of the Day, KILL
-  // Interface1=CTIClient.exe,CTIClient,KILL
   "Customize": {
+      // OutputExtraSpacing=No
+      // MinimizeTrackerOnNewCall=YES/NO
+      // CloseSessionAtCallEnd=YES/NO
+      // AllowTestConclusion=YES/NO
       "TitleType": "ACCOUNT",
       // This can be ACCOUNT, CUSTOMER or BOTH. The default is ACCOUNT
       "ShowRescheduleButton": "YES",
@@ -280,27 +279,43 @@
       "ShowAllControlsEnabled": "Yes",
       "ShowAllControlsDefault": "Yes"
   },
-  // OutputExtraSpacing=No
-  // MinimizeTrackerOnNewCall=YES/NO
-  // CloseSessionAtCallEnd=YES/NO
-  // AllowTestConclusion=YES/NO
   "Help Pages": {
+      // ShowStyle = DoNotMaximize
       // if Browser = SynthesysBrowser, is present, synthesys browser will be used to view ;help pages
       // if ShowStyle = DoNotMaximize is specified, the default browser will not be maximized
       "Browser": "SynthesysBrowser"
   },
-  // ShowStyle = DoNotMaximize
   "Workstation": {
+      // LocalUserPWD=5yn7h35y5!
+      // TimeZoneCheck=OFF
+      // AdvancedLogging=False
+      // CopyAllScripts=False
+      // CreateLastTran=true
       "FrontscreenFile": "FrontScreen.htm",
       "FrontscreenWidth": 792,
       "FrontscreenHeight": 611
   },
-  // LocalUserPWD=5yn7h35y5!
-  // TimeZoneCheck=OFF
-  // AdvancedLogging=False
-  // CopyAllScripts=False
-  // CreateLastTran=true
   "CTI": {
+      // AutoAnswer=TRUE
+      // AutoPark=TRUE
+      // AppendOBCampaignID=TRUE/FALSE
+      // AutoDial=TRUE/FALSE
+      // CTIParam=
+      // NotifyNoOBCalls=TRUE
+      // ForceStacked=FALSE
+      // CommentDormantCalls=TRUE
+      // CTIImplimented=TRUE
+      // SelectBreakReason=TRUE
+      // AutoAbortonTransfer=TRUE
+      // AutoAbortonTransferInternal=TRUE
+      // InboundAutoAbortOnTransferReason=-5
+      // OutboundAutoAbortOnTransferReason=-108
+      // DisableTransferOptions=TRUE
+      // PopUnrecognisedDDI=TRUE
+      // MaxOBRingTime=30
+      // SaveCallflowOnHold=FALSE
+      // AllowConference=No
+      // SupportedHybridOps=CONSULT_TRANSFER
       // PrefixedNumberLength = 3
       // DiallingPrefix = 9,
       // is the cti toolbar enabled by default? the default vallue is TRUE
@@ -317,27 +332,10 @@
       "AllowTransferOnConnectedConsult": false,
       "SelectBreakReason": true
   },
-  // AutoAnswer=TRUE
-  // AutoPark=TRUE
-  // AppendOBCampaignID=TRUE/FALSE
-  // AutoDial=TRUE/FALSE
-  // CTIParam=
-  // NotifyNoOBCalls=TRUE
-  // ForceStacked=FALSE
-  // CommentDormantCalls=TRUE
-  // CTIImplimented=TRUE
-  // SelectBreakReason=TRUE
-  // AutoAbortonTransfer=TRUE
-  // AutoAbortonTransferInternal=TRUE
-  // InboundAutoAbortOnTransferReason=-5
-  // OutboundAutoAbortOnTransferReason=-108
-  // DisableTransferOptions=TRUE
-  // PopUnrecognisedDDI=TRUE
-  // MaxOBRingTime=30
-  // SaveCallflowOnHold=FALSE
-  // AllowConference=No
-  // SupportedHybridOps=CONSULT_TRANSFER
   "CallTrackerSettings": {
+      // AutoPaging=Yes
+      // PopwatchDirectory=True
+      // ClearDocumentReEditUnlockSequence=YES
       "Sound": "Off",
       "OnlyKillCTFromRunner": "NO",
       "EditCallOption": "ON",
@@ -353,19 +351,16 @@
       "ShowFieldName": "Yes",
       "HiddenFieldsRefreshInterval": 6
   },
-  // AutoPaging=Yes
-  // PopwatchDirectory=True
-  // ClearDocumentReEditUnlockSequence=YES
   "TAPI": {
+      // ACDType=Mitel
+      // at the moment only other type recognised is Meridian
   },
-  // ACDType=Mitel
-  // at the moment only other type recognised is Meridian
   "Queue Manager": {
+      // ThreeAMRestart=TRUE
       "RetryLeadTime": 10,
       "QueueRefresh": 5,
       "UseListFilterService": "Yes"
   },
-  // ThreeAMRestart=TRUE
   "CRM Import": {
       "Fast": "Yes",
       "FastSort": "Yes"
@@ -377,9 +372,31 @@
       "PopScript": "Yes"
   },
   "Predictive": {
-      "Blending": "Active",
+      // CanonicaliseNumbers=False
+      // SINGLE SWITCH INFO/EXAMPLE
+      // Default is 2s ? but this slows down dialling, and Synthesys Switch can
+      // run at full speed with no delays.
+      // MinIdleTime=0
+      // MULTISWITCH INFO/EXAMPLE
+      // Default is 2 ? but this slows down dialling, and Synthesys Switch can
+      // run at full speed with no delays if 0
+      // MinIdleTime=2
+      // TimeBetweenCallCounts=30
+      // TimeBeforeUnknown=60
+      // RemoveBrakes=false
+      // LoggingEnabled=false
+      // AllowNonWorkableReschedules=false
+      // OnlyAssignReschedWhenAvail=false
+      // [CTI-SynthesysSwitch]
+      // Interface=CTIClient.exe SynthesysSwitch,CTIClient,KILL
       "EvaluateAvailableAgent": true,
       "PendingInboundMaxLifeMinutes": 10,
+      "Blending": "Active",
+      "SendInvalidNumberBillingRPC": true,
+      "MinNumLen": 8,
+      "OnlyAssignReschedWhenAvail": true,
+      "RescheduledForceOB": false,
+      "LMSInterfacePeriod": 1,
       "NuisanceCallBlockTime": 0,
       "AnswerMachineBlockTime": 0,
       // TimeBeforeUnknown=20
@@ -413,23 +430,6 @@
       "NotAnsweringTime": 30,
       "CallPriorityEnabled": true
   },
-  // CanonicaliseNumbers=False
-  // SINGLE SWITCH INFO/EXAMPLE
-  // Default is 2s ? but this slows down dialling, and Synthesys Switch can
-  // run at full speed with no delays.
-  // MinIdleTime=0
-  // MULTISWITCH INFO/EXAMPLE
-  // Default is 2 ? but this slows down dialling, and Synthesys Switch can
-  // run at full speed with no delays if 0
-  // MinIdleTime=2
-  // TimeBetweenCallCounts=30
-  // TimeBeforeUnknown=60
-  // RemoveBrakes=false
-  // LoggingEnabled=false
-  // AllowNonWorkableReschedules=false
-  // OnlyAssignReschedWhenAvail=false
-  // [CTI-SynthesysSwitch]
-  // Interface=CTIClient.exe SynthesysSwitch,CTIClient,KILL
   "EXPORT": {
       "Step4State": 1,
       "TimeBetweenChecks": 10
@@ -467,89 +467,88 @@
       "AutoPopHistory": "No"
   },
   "Recycling": {
+      // MinimumSleep=
+      // Audit=TRUE
       "Enabled": true,
       "Queue": "ClassicRecycle",
-      // LogLevel=ExtraInfo
       "LogLevel": "Info",
       "CheckTimesCalled": false
   },
-  // MinimumSleep=
-  // Audit=TRUE
   "Outbound Group Properties": {
+      // Propertyn=MinCallsBeforePredictive,Default
+      // Propertyn=AMDFalsePositiveRate,
+      // [Blender]
+      // Key=Synthesys
+      // [Personnel]
+      // TimeWarnerPWCheck=TRUE
       "Property0": "IdleTimeout,0"
   },
-  // Propertyn=MinCallsBeforePredictive,Default
-  // Propertyn=AMDFalsePositiveRate,
-  // [Blender]
-  // Key=Synthesys
-  // [Personnel]
-  // TimeWarnerPWCheck=TRUE
   "SQI Service": {
+      // [SQM Service]
+      // QueryTimeout=15
       "InvalidateOnCRMUpdate": 0,
       "QueryTimeout": 120
   },
-  // [SQM Service]
-  // QueryTimeout=15
   "BulkOBService": {
       "SMTPServer": "",
       "EmailType": "BulkOBService.SmtpEmail",
       "SMSType": ""
   },
   "Outbound Manager": {
+      // DisableTotalTimesColumn=TRUE
       "AllowQuotas": "Yes"
   },
-  // DisableTotalTimesColumn=TRUE
   "CRM Web Services": {
+      // NonSecuredUser=Automatic
+      // LogReplies=True
+      // LogRequests=True
+      // [Dialler Web Services]
+      // LogRequests=True
+      // LogReplies=True
+      // LogFileName=DiallerWebServiceEngine
+      // [WebChatService]
+      // ListenAddress=http://<<servername>>/WebChatService
+      // [WebServices]
+      // BaseAddress=http://<<servername>>
       "NonSecure": true
   },
-  // NonSecuredUser=Automatic
-  // LogReplies=True
-  // LogRequests=True
-  // [Dialler Web Services]
-  // LogRequests=True
-  // LogReplies=True
-  // LogFileName=DiallerWebServiceEngine
-  // [WebChatService]
-  // ListenAddress=http://<<servername>>/WebChatService
-  // [WebServices]
-  // BaseAddress=http://<<servername>>
   "OB Settings": {
       "AllowQueueMonitor": "Yes",
       "AllowQueueMan": "Yes",
       "ChangeRunningCallState": true
   },
   "Highways": {
+      // PopupListWidth=732
+      // PopupListHeight=280
       "DSN": "Phoenix",
       "UID": "synthesys",
       "PWD": "synthesys",
       "ExportQueryTimeOut": 10,
       "TimeBetweenChecks": 5
   },
-  // PopupListWidth=732
-  // PopupListHeight=280
   "Activator": {
+      // [Branding]
+      // ProductName=MiContact Center Outbound
+      // ProductIcon16=English\Mitel\MiCC.ico
+      // ProductIcon32=English\Mitel\MiCC.ico
+      // DesktopIcon=English\Mitel\MiCC.ico
+      // SplashImage=English\Mitel\SplashMitel.jpg
+      // Font=English\Mitel\MuseoSans-100.otf
+      // FontName=Museo Sans 100
+      // WSHtmlPath=Bin\English\Mitel
+      // ReportWizardBanner=Bin\English\Mitel\ReportWizardBanner.jpeg
+      // ScheduleWizardBanner=Bin\English\Mitel\ScheduleWizardBanner.jpeg
+      // ExportWizardBanner=Bin\English\Mitel\ExportWizardBanner.jpeg
+      // SQIWizardBanner=Bin\English\Mitel\SQIWizardBanner.jpeg
+      // QueueMonitorWizardBanner=Bin\English\Mitel\QueueMonitorWizardBanner.jpeg
+      // QueueManipulationWizardBanner=Bin\English\Mitel\QueueManipulationWizardBanner.jpeg
+      // RecyclingBanner=Bin\English\Mitel\RecyclingBanner.jpeg
+      // AboutSwirl=Bin\English\Mitel\SwirlAbout.bmp
+      // MainSwirl=Bin\English\Mitel\SwirlMain.bmp
+      // MainSwirlHeight=24
+      // MainSwirlWidth=24
       "TimeIncrement": 5
   },
-  // [Branding]
-  // ProductName=MiContact Center Outbound
-  // ProductIcon16=English\Mitel\MiCC.ico
-  // ProductIcon32=English\Mitel\MiCC.ico
-  // DesktopIcon=English\Mitel\MiCC.ico
-  // SplashImage=English\Mitel\SplashMitel.jpg
-  // Font=English\Mitel\MuseoSans-100.otf
-  // FontName=Museo Sans 100
-  // WSHtmlPath=Bin\English\Mitel
-  // ReportWizardBanner=Bin\English\Mitel\ReportWizardBanner.jpeg
-  // ScheduleWizardBanner=Bin\English\Mitel\ScheduleWizardBanner.jpeg
-  // ExportWizardBanner=Bin\English\Mitel\ExportWizardBanner.jpeg
-  // SQIWizardBanner=Bin\English\Mitel\SQIWizardBanner.jpeg
-  // QueueMonitorWizardBanner=Bin\English\Mitel\QueueMonitorWizardBanner.jpeg
-  // QueueManipulationWizardBanner=Bin\English\Mitel\QueueManipulationWizardBanner.jpeg
-  // RecyclingBanner=Bin\English\Mitel\RecyclingBanner.jpeg
-  // AboutSwirl=Bin\English\Mitel\SwirlAbout.bmp
-  // MainSwirl=Bin\English\Mitel\SwirlMain.bmp
-  // MainSwirlHeight=24
-  // MainSwirlWidth=24
   "WorkspaceManagement": {
       "AllowMultipleTeamsPerUser": false
   },
@@ -588,16 +587,16 @@
       "AnswerMachineTimeOut": 2,
       "AnswerMachineFaxTimeOut": 5,
       "MaxRingTime": 20,
-      "Recording": true,
-      "RecordingAgent": true,
-      "RecordingCustomer": true,
-      "CLIToPresent": 442079406700,
+      "Recording": false,
+      "RecordingAgent": false,
+      "RecordingCustomer": false,
+      // CLIToPresent=+15124982275
+      "CLIToPresent": "+15126014748",
       "NuisanceWavFile": "",
       "MusicOnHold": "",
       "EndpointAddress": "net.tcp://TALKDESKDEV:8901/SynthesysSwitch",
-      // BillingWebhook=https://api.talkdeskstg.com/webhooks/noetica/events/billing/652ffeb29cece6044285ebe7
-      "BillingWebhook": "https://api.talkdeskqa.com/webhooks/noetica/events/billing/65290b341113d479a43245af",
-      "BillingWebhookTenantId": "652ffeb29cece6044285ebe7",
+      "BillingWebhook": "https://api.talkdeskapp.com/webhooks/noetica/events/billing/111111111111111111111111",
+      "BillingWebhookTenantId": "111111111111111111111111",
       "BillingWebhookFlushFrequency": 10,
       "BillingWebhookMaximumPayload": 100,
       "BillingWebhookRetries": 10
@@ -625,16 +624,21 @@
   },
   "Timezones": {
       "TimeZoneEnabled": true,
-      "DEFAULT": "UTC",
       "ServerTimezone": "UTC",
-      "TIMEZONE1": "UTC",
-      "TIMEZONE2": "GMT Standard Time",
-      "TIMEZONE3": "China Standard Time"
+      "Default": "Central Standard Time",
+      "TIMEZONE1": "Eastern Standard Time",
+      "TIMEZONE2": "Central Standard Time",
+      "TIMEZONE3": "Pacific Standard Time"
+  },
+  "Campaign Manager": {
+      "EntityImportDateTimeFormatStrings": "MM/dd/yyyy$MM/dd/yyyy hh:mm$yyyy-MM-dd$M/dd/yyyy",
+      "StudioFlowOptionDebug": true,
+      "UniqueSMSCLIPerCampaign": true
   },
   "Telephony Dialler SDK": {
-      "Enabled": true
+      "Enabled": true,
+      "UnnailedForceInbound": true
   },
-  // OverrideLogoutCheck=True
   "LiveMonitor": {
       "RefreshInterval": 1
   },
@@ -642,18 +646,19 @@
       "DefaultBlenderSettings": "{\"EntireTeamInbound\":true,\"InboundOnly\":false,\"MaxInboundAgents\":1,\"OutboundOnly\":false,\"Rotate\":false,\"TargetFreeAgents\":0}"
   },
   "OBMessageService": {
-      // OneComWebHookUrl=http://*/webhook/
-      "OneComWebHookUrl2": "http://contoso.dev.noeticacloud.com/webhook/",
-      // OneComWebHookUrl=http://localhost/webhook/
-      "TalkdeskSmsWebHookUrl": "http://contoso.dev.noeticacloud.com/webhook/",
-      "TalkdeskSmsCallbackUrl": "https://contoso.dev.noeticacloud.com/webhook/",
-      "TalkdeskAccessTokenUrl": "https://whitzard-team-stg.talkdeskstgid.com/oauth/token",
-      // added by Max for Email support
-      "TalkdeskEmailWebHookUrl": "http://contoso.dev.noeticacloud.com/webhook/",
-      "TalkdeskEmailCallbackUrl": "https://contoso.dev.noeticacloud.com/webhook/"
+      "TalkdeskSmsWebHookUrl": "http://demo.talkdesk.noeticaonline.com/webhook/",
+      "TalkdeskSmsCallbackUrl": "https://demo.talkdesk.noeticaonline.com/webhook/",
+      "TalkdeskAccessTokenUrl": "",
+      "TalkdeskEmailWebHookUrl": "http://demo.talkdesk.noeticaonline.com/webhook/",
+      "TalkdeskEmailCallbackUrl": "https://demo.talkdesk.noeticaonline.com/webhook/",
+      "TalkdeskEmailBulkSize": 10,
+      "TalkdeskSmsBulkSize": 30
   },
-  "Campaign Manager": {
-      "UniqueSMSCLIPerCampaign": true,
-      "StudioFlowOptionDebug": true
+  "CRM Service": {
+      "SkipImportHistoryInsert": "yes",
+      "SkipHistoryInsertImportCustomer": "yes",
+      "SkipHistoryInsertCallQueued": "yes",
+      "SkipHistoryInsertCallChangedState": "yes",
+      "SkipHistoryInsertCallChangedPriority": "yes"
   }
 }
