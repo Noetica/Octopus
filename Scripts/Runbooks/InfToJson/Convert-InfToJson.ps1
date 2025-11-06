@@ -280,11 +280,11 @@ Write-Verbose "Strip Quotes: $StripQuotes"
 Write-Verbose "Max File Size: $MaxFileSizeMB MB"
 Write-Verbose "Max Sections: $MaxSections"
 
-# Initialize result structure
-$result = @{}
+# Initialize result structure (using [ordered] to preserve section/key order)
+$result = [ordered]@{}
 $section = $null
 $seenKeys = @{}  # Track keys per section for duplicate detection
-$sectionArrayItems = @{}  # Track array items for non-standard sections
+$sectionArrayItems = [ordered]@{}  # Track array items for non-standard sections
 $sectionHasKeyValue = @{}  # Track if section has any key=value pairs
 $lineNumber = 0
 
@@ -317,10 +317,10 @@ try {
             }
 
             # Check for duplicate section
-            if ($result.ContainsKey($sectionName)) {
+            if ($result.Contains($sectionName)) {
                 Write-ScriptWarning "Line ${lineNumber}: Duplicate section '[$sectionName]' found. Values will be merged."
             } else {
-                $result[$sectionName] = @{}
+                $result[$sectionName] = [ordered]@{}
                 $seenKeys[$sectionName] = @{}
             }
 
@@ -328,8 +328,8 @@ try {
             Write-Verbose "Line ${lineNumber}: Found section [$sectionName]"
 
             # Initialize tracking for this section
-            if (-not $sectionArrayItems.ContainsKey($sectionName)) {
-                $sectionArrayItems[$sectionName] = @()
+            if (-not $sectionArrayItems.Contains($sectionName)) {
+                $sectionArrayItems[$sectionName] = New-Object System.Collections.ArrayList
                 $sectionHasKeyValue[$sectionName] = $false
             }
 
@@ -359,8 +359,8 @@ try {
                 if ($DefaultSection) {
                     Write-Verbose "Line ${lineNumber}: Key '$key' found before any section, using default section '$DefaultSection'"
                     $section = $DefaultSection
-                    if (-not $result.ContainsKey($section)) {
-                        $result[$section] = @{}
+                    if (-not $result.Contains($section)) {
+                        $result[$section] = [ordered]@{}
                         $seenKeys[$section] = @{}
                     }
                 } else {
@@ -397,7 +397,7 @@ try {
         # If we're in a section, store as array item (for CSV-like sections)
         if ($section) {
             Write-Verbose "Line ${lineNumber}: Storing non-standard line in section '[$section]' as array item"
-            $sectionArrayItems[$section] += $line
+            $null = $sectionArrayItems[$section].Add($line)
             return
         }
 
@@ -424,10 +424,10 @@ foreach ($sectionName in @($sectionArrayItems.Keys)) {
         }
         # If section has BOTH key=value pairs and array items, add as _items property
         else {
-            if (-not $result.ContainsKey($sectionName)) {
-                $result[$sectionName] = @{}
+            if (-not $result.Contains($sectionName)) {
+                $result[$sectionName] = [ordered]@{}
             }
-            $result[$sectionName]['_items'] = $sectionArrayItems[$sectionName]
+            $result[$sectionName]['_items'] = @($sectionArrayItems[$sectionName])
             Write-Verbose "Added $($sectionArrayItems[$sectionName].Count) array items to section [$sectionName] under '_items'"
         }
     }
