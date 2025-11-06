@@ -181,6 +181,8 @@ Write-Verbose "Strip Quotes: $StripQuotes"
 $result = @{}
 $section = $null
 $seenKeys = @{}  # Track keys per section for duplicate detection
+$sectionArrayItems = @{}  # Track array items for non-standard sections
+$sectionHasKeyValue = @{}  # Track if section has any key=value pairs
 $lineNumber = 0
 
 # Read and process the INF file
@@ -214,6 +216,13 @@ try {
 
             $section = $sectionName
             Write-Verbose "Line ${lineNumber}: Found section [$sectionName]"
+
+            # Initialize tracking for this section
+            if (-not $sectionArrayItems.ContainsKey($sectionName)) {
+                $sectionArrayItems[$sectionName] = @()
+                $sectionHasKeyValue[$sectionName] = $false
+            }
+
             return
         }
 
@@ -263,10 +272,19 @@ try {
             Write-Verbose "Line ${lineNumber}: [$section] $key = $rawValue (Type: $($typedValue.GetType().Name))"
 
             $result[$section][$key] = $typedValue
+            $sectionHasKeyValue[$section] = $true
             return
         }
 
-        # Line didn't match any pattern
+        # Line didn't match key=value pattern
+        # If we're in a section, store as array item (for CSV-like sections)
+        if ($section) {
+            Write-Verbose "Line ${lineNumber}: Storing non-standard line in section '[$section]' as array item"
+            $sectionArrayItems[$section] += $line
+            return
+        }
+
+        # No section context, warn about unparseable line
         Write-ScriptWarning "Line ${lineNumber}: Unable to parse line: $line"
     }
 } catch {
@@ -276,6 +294,25 @@ try {
 # Check if we encountered any errors in strict mode
 if ($StrictMode -and $script:HasErrors) {
     throw "Processing failed due to errors (StrictMode enabled)"
+}
+
+# Process sections with array items
+foreach ($sectionName in $sectionArrayItems.Keys) {
+    if ($sectionArrayItems[$sectionName].Count -gt 0) {
+        # If section has NO key=value pairs, make it a pure array
+        if (-not $sectionHasKeyValue[$sectionName]) {
+            $result[$sectionName] = $sectionArrayItems[$sectionName]
+            Write-Verbose "Section [$sectionName] converted to array with $($sectionArrayItems[$sectionName].Count) items"
+        }
+        # If section has BOTH key=value pairs and array items, add as _items property
+        else {
+            if (-not $result.ContainsKey($sectionName)) {
+                $result[$sectionName] = @{}
+            }
+            $result[$sectionName]['_items'] = $sectionArrayItems[$sectionName]
+            Write-Verbose "Added $($sectionArrayItems[$sectionName].Count) array items to section [$sectionName] under '_items'"
+        }
+    }
 }
 
 # Check if any data was parsed
