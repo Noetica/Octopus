@@ -32,6 +32,9 @@
 .PARAMETER YesNoAsBoolean
     When enabled, converts Yes/No values to true/false booleans.
 
+.PARAMETER ForceString
+    When enabled, outputs all values as strings (overrides all type conversion).
+
 .PARAMETER DefaultSection
     Name for the section to use for key-value pairs found before any section header.
     Default: "_global_"
@@ -68,6 +71,10 @@
     .\Convert-InfToJson.ps1 -InfPath "C:\config\app.inf" -YesNoAsBoolean
     Creates C:\config\app.json with Yes/No values converted to true/false
 
+.EXAMPLE
+    .\Convert-InfToJson.ps1 -InfPath "C:\config\app.inf" -ForceString
+    Creates C:\config\app.json with all values as strings (no type conversion)
+
 .NOTES
     Author: Enhanced by code review
     Version: 2.1
@@ -99,6 +106,9 @@ param(
 
     [Parameter(Mandatory = $false)]
     [switch]$YesNoAsBoolean,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$ForceString,
 
     [Parameter(Mandatory = $false)]
     [string]$DefaultSection = '_global_',
@@ -138,6 +148,11 @@ function Write-ScriptWarning {
 
 function ConvertTo-TypedValue {
     param([string]$Value)
+
+    # Return as string if ForceString is enabled (overrides everything)
+    if ($ForceString) {
+        return $Value
+    }
 
     # Return as-is if type conversion is disabled
     if ($NoTypeConversion) {
@@ -307,6 +322,7 @@ Write-Verbose "Type Conversion: $(-not $NoTypeConversion)"
 Write-Verbose "Strip Quotes: $StripQuotes"
 Write-Verbose "Empty As Null: $EmptyAsNull"
 Write-Verbose "Yes/No As Boolean: $YesNoAsBoolean"
+Write-Verbose "Force String: $ForceString"
 Write-Verbose "Max File Size: $MaxFileSizeMB MB"
 Write-Verbose "Max Sections: $MaxSections"
 
