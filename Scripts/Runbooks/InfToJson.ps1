@@ -13,10 +13,10 @@ $seenKeys = @{}  # Track keys per section for duplicate detection
 
 Get-Content -Path $infPath | ForEach-Object {
     $line = $_.Trim()
-    
+
     # Skip empty lines and full-line comments
     if ($line -eq '' -or $line -match '^;') { return }
-    
+
     # Section header
     if ($line -match '^\[(.+)\]$') {
         $section = $matches[1]
@@ -32,21 +32,21 @@ Get-Content -Path $infPath | ForEach-Object {
         }
         $key = $matches[1].Trim()
         $value = $matches[2].Trim()
-        
+
         # Check for duplicate keys in the same section
         if ($seenKeys[$section].ContainsKey($key)) {
             Write-Warning "Duplicate key '$key' found in section '[$section]'. Previous value will be overwritten."
         }
         $seenKeys[$section][$key] = $true
-        
+
         # Remove inline comments
         if ($value -match '^([^;]+?)\s*;') {
             $value = $matches[1].Trim()
         }
-        
+
         # Remove trailing commas
         $value = $value.TrimEnd(',').Trim()
-        
+
         # Type conversion
         if ($value -imatch '^(true|false)$') {
             # Boolean conversion (case-insensitive)
@@ -56,8 +56,8 @@ Get-Content -Path $infPath | ForEach-Object {
         elseif ($value -match '^-?\d+\.\d+([eE][+-]?\d+)?$' -or $value -match '^-?\d+([eE][+-]?\d+)$') {
             $value = [double]$value
         }
-        # Integer conversion (exclude leading zeros and scientific notation)
-        elseif ($value -match '^-?\d+$' -and $value -notmatch '^-?0+\d+' -and $value -notmatch '[eE]') {
+        # Integer conversion (exclude leading zeros)
+        elseif ($value -match '^-?\d+$' -and $value -notmatch '^-?0\d+') {
             $value = [int64]$value
         }
         elseif ($value -match '^\[.*\]$|^\{.*\}$') {
@@ -69,12 +69,12 @@ Get-Content -Path $infPath | ForEach-Object {
                 # Keep as string if JSON parsing fails
             }
         }
-        
+
         $result[$section][$key] = $value
     }
 }
 
 # Convert to JSON with depth limit to handle nested structures
-# Note: -Depth 10 limits nesting depth. Deeply nested JSON structures (>10 levels) 
+# Note: -Depth 10 limits nesting depth. Deeply nested JSON structures (>10 levels)
 # in INF values will be truncated. Increase depth if needed for complex structures.
 $result | ConvertTo-Json -Depth 10
