@@ -20,10 +20,6 @@
 .PARAMETER Depth
     Maximum depth for JSON conversion. Default: 10
 
-.PARAMETER CreateArtifact
-    When enabled, registers the output file as an Octopus artifact.
-    Default: true
-
 .EXAMPLE
     .\Export-OctopusVariables.ps1
     Exports all non-Octopus variables to TEMP directory with default settings
@@ -50,10 +46,7 @@ param(
     [string]$OutputPath,
 
     [Parameter(Mandatory = $false)]
-    [int]$Depth = 10,
-
-    [Parameter(Mandatory = $false)]
-    [bool]$CreateArtifact = $true
+    [int]$Depth = 10
 )
 
 #region Initialization
@@ -183,18 +176,6 @@ if (Test-Path $filePath) {
     Write-Host "✓ Successfully exported $($parameters.Count) parameters"
     Write-Host "✓ File size: $([math]::Round($fileInfo.Length / 1KB, 2)) KB"
     Write-Host "✓ Output: $filePath"
-
-    # Register the file as an Octopus artifact if requested
-    if ($CreateArtifact) {
-        Write-Host "Registering as Octopus artifact..."
-        try {
-            New-OctopusArtifact -Path $filePath
-            Write-Host "✓ Artifact registered successfully"
-        }
-        catch {
-            Write-Warning "Failed to register artifact: $_"
-        }
-    }
 }
 else {
     Write-Error "Failed to create output file: $filePath"
