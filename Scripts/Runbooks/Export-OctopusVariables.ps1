@@ -179,9 +179,9 @@ $jsonContent | Out-File -FilePath $filePath -Encoding UTF8 -Force
 # Verify file was created
 if (Test-Path $filePath) {
     $fileInfo = Get-Item $filePath
-    Write-Host ("✓ Successfully exported " + $parameters.Count + " parameters")
-    Write-Host ("✓ File size: " + [math]::Round($fileInfo.Length / 1KB, 2) + " KB")
-    Write-Host ("✓ Output: " + $filePath)
+    Write-Host ("[OK] Successfully exported " + $parameters.Count + " parameters")
+    Write-Host ("[OK] File size: " + [math]::Round($fileInfo.Length / 1KB, 2) + " KB")
+    Write-Host ("[OK] Output: " + $filePath)
 }
 else {
     Write-Error ("Failed to create output file: " + $filePath)
