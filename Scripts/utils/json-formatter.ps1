@@ -96,6 +96,7 @@ function ConvertTo-CustomJson {
 
     $indent = "  " * $IndentLevel
     $nextIndent = "  " * ($IndentLevel + 1)
+    $nestedIndent = "  " * ($IndentLevel + 2)
     $lines = @()
 
     # Add header comments at root level
@@ -141,7 +142,7 @@ function ConvertTo-CustomJson {
                     $isLastItem = ($j -eq $value.Count - 1)
                     $itemJson = ConvertTo-JsonValue -Value $item
                     $comma = if ($isLastItem) { "" } else { "," }
-                    $lines += "    $nextIndent$itemJson$comma"
+                    $lines += "$nestedIndent$itemJson$comma"
                 }
 
                 $comma = if ($isLast) { "" } else { "," }
