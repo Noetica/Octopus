@@ -71,7 +71,7 @@ $parameters = $OctopusParameters.Keys | Where-Object {
     -not $_.StartsWith("Octopus") -and -not $_.Contains("Fragment") -and -not $_.Contains("env:")
 } | Sort-Object
 
-Write-Host "Found $($parameters.Count) parameters to export"
+Write-Host ("Found " + $parameters.Count + " parameters to export")
 
 #endregion
 
@@ -136,13 +136,19 @@ Write-Host "Generating JSON output..."
 
 # Build header comments if requested
 if ($IncludeComments) {
+    $tenantName = $OctopusParameters['Octopus.Deployment.Tenant.Name']
+    $tenantSlugComment = $OctopusParameters['Octopus.Deployment.Tenant.Slug']
+    $projectName = $OctopusParameters['Octopus.Project.Name']
+    $environmentName = $OctopusParameters['Octopus.Environment.Name']
+    $exportedDate = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+
     $headerComments = @(
         "// Octopus Deploy Variables Export",
-        "// Tenant: $($OctopusParameters['Octopus.Deployment.Tenant.Name'])",
-        "// Tenant Slug: $($OctopusParameters['Octopus.Deployment.Tenant.Slug'])",
-        "// Project: $($OctopusParameters['Octopus.Project.Name'])",
-        "// Environment: $($OctopusParameters['Octopus.Environment.Name'])",
-        "// Exported: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))",
+        "// Tenant: $tenantName",
+        "// Tenant Slug: $tenantSlugComment",
+        "// Project: $projectName",
+        "// Environment: $environmentName",
+        "// Exported: $exportedDate",
         "//",
         "// Note: Octopus internal variables, Fragment parameters, and environment variables are excluded",
         ""
@@ -163,7 +169,7 @@ else {
 #region Write Output
 
 # Write to the output file with UTF-8 encoding
-Write-Host "Writing to file: $filePath"
+Write-Host ("Writing to file: " + $filePath)
 $jsonContent | Out-File -FilePath $filePath -Encoding UTF8 -Force
 
 #endregion
@@ -173,12 +179,12 @@ $jsonContent | Out-File -FilePath $filePath -Encoding UTF8 -Force
 # Verify file was created
 if (Test-Path $filePath) {
     $fileInfo = Get-Item $filePath
-    Write-Host "✓ Successfully exported $($parameters.Count) parameters"
-    Write-Host "✓ File size: $([math]::Round($fileInfo.Length / 1KB, 2)) KB"
-    Write-Host "✓ Output: $filePath"
+    Write-Host ("✓ Successfully exported " + $parameters.Count + " parameters")
+    Write-Host ("✓ File size: " + [math]::Round($fileInfo.Length / 1KB, 2) + " KB")
+    Write-Host ("✓ Output: " + $filePath)
 }
 else {
-    Write-Error "Failed to create output file: $filePath"
+    Write-Error ("Failed to create output file: " + $filePath)
     exit 1
 }
 
