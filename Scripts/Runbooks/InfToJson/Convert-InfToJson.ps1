@@ -380,6 +380,7 @@ function ConvertTo-JSONC {
 
     $indent = "  " * $IndentLevel
     $nextIndent = "  " * ($IndentLevel + 1)
+    $nestedIndent = "  " * ($IndentLevel + 2)
     $lines = @()
     $lines += "$indent{"
 
@@ -399,7 +400,7 @@ function ConvertTo-JSONC {
             # Add section comments inside array
             if ($SectionComments.Contains($sectionKey)) {
                 foreach ($comment in $SectionComments[$sectionKey]) {
-                    $lines += "    $nextIndent// $comment"
+                    $lines += "$nestedIndent// $comment"
                 }
             }
 
@@ -408,7 +409,7 @@ function ConvertTo-JSONC {
                 $isLast = ($i -eq $sectionValue.Count - 1)
                 $itemJson = ConvertTo-JsonValue -Value $item -IndentLevel ($IndentLevel + 2)
                 $comma = if ($isLast) { "" } else { "," }
-                $lines += "    $nextIndent$itemJson$comma"
+                $lines += "$nestedIndent$itemJson$comma"
             }
             $comma = if ($isLastSection) { "" } else { "," }
             $lines += "$nextIndent]$comma"
@@ -420,7 +421,7 @@ function ConvertTo-JSONC {
             # Add section comments inside object (at the top)
             if ($SectionComments.Contains($sectionKey)) {
                 foreach ($comment in $SectionComments[$sectionKey]) {
-                    $lines += "    $nextIndent// $comment"
+                    $lines += "$nestedIndent// $comment"
                 }
             }
 
@@ -435,7 +436,7 @@ function ConvertTo-JSONC {
                 $commentKey = "${sectionKey}.${key}"
                 if ($Comments.ContainsKey($commentKey)) {
                     foreach ($comment in $Comments[$commentKey]) {
-                        $lines += "    $nextIndent// $comment"
+                        $lines += "$nestedIndent// $comment"
                     }
                 }
 
@@ -448,10 +449,10 @@ function ConvertTo-JSONC {
                 # If there are trailing comments, don't add comma to value line
                 # The comma will be added after the last trailing comment
                 if ($hasTrailingComments) {
-                    $lines += "    $nextIndent`"$key`": $valueJson"
+                    $lines += "$nestedIndent`"$key`": $valueJson"
                 } else {
                     $comma = if ($isLastKey) { "" } else { "," }
-                    $lines += "    $nextIndent`"$key`": $valueJson$comma"
+                    $lines += "$nestedIndent`"$key`": $valueJson$comma"
                 }
 
                 # Add key-specific trailing comments
@@ -463,9 +464,9 @@ function ConvertTo-JSONC {
 
                         # Add comma after the last trailing comment if this isn't the last key
                         if ($isLastComment -and -not $isLastKey) {
-                            $lines += "    $nextIndent// $comment,"
+                            $lines += "$nestedIndent// $comment,"
                         } else {
-                            $lines += "    $nextIndent// $comment"
+                            $lines += "$nestedIndent// $comment"
                         }
                     }
                 }
@@ -488,7 +489,7 @@ function ConvertTo-JSONC {
                 $escapedBlockName = $block.SectionName -replace '\\', '\\' -replace '"', '\"'
                 $lines += "$nextIndent// `"$escapedBlockName`": {"
                 foreach ($comment in $block.Comments) {
-                    $lines += "$nextIndent//     $comment"
+                    $lines += "$nestedIndent//   $comment"
                 }
                 $comma = if ($isLastSection) { "" } else { "," }
                 $lines += "$nextIndent// }$comma"
