@@ -906,12 +906,29 @@ try {
     Write-Verbose "Converting to JSON format..."
 
     if ($PreserveComments) {
-        # Add JSONC header
-        $jsonContent = "// Exported from: $RegistryPath`n"
-        $jsonContent += "// Export date: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))`n"
-        $jsonContent += "`n"
-        $rawJson = $registryData | ConvertTo-Json -Depth $Depth -Compress:$false
-        $jsonContent += (Format-JsonIndent -Json $rawJson)
+        # Use custom JSON formatter with comments
+        $headerComments = @(
+            "// Exported from: $RegistryPath",
+            "// Export date: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss'))",
+            "//"
+        )
+
+        # Add recursion info to header
+        if ($Recurse) {
+            $headerComments += "// Recursive export (Max Depth: $MaxDepth)"
+        } else {
+            $headerComments += "// Single key export (no subkeys)"
+        }
+        $headerComments += ""
+
+        # Define inline comments for special registry keys
+        $inlineKeyComments = @{
+            '_metadata' = @('Registry Key Metadata')
+            '_subkeys'  = @('Subkeys')
+        }
+
+        $jsonLines = ConvertTo-CustomJson -Data $registryData -HeaderComments $headerComments -InlineKeyComments $inlineKeyComments
+        $jsonContent = $jsonLines -join "`n"
     } else {
         # Use built-in ConvertTo-Json and fix indentation
         $rawJson = $registryData | ConvertTo-Json -Depth $Depth -Compress:$false

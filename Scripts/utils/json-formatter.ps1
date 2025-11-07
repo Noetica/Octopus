@@ -52,6 +52,11 @@ function ConvertTo-CustomJson {
         Array of comment lines to add at the top of the output.
         Each line should start with "//".
 
+    .PARAMETER InlineKeyComments
+        Hashtable of key names to comment arrays for inline comments.
+        Comments are added before the key in the JSON output.
+        Example: @{ "_metadata" = @("Registry Key Metadata"); "_subkeys" = @("Subkeys") }
+
     .PARAMETER IndentLevel
         Starting indentation level. Typically 0 for root level.
         Default: 0
@@ -68,6 +73,11 @@ function ConvertTo-CustomJson {
         $comments = @("// My Config", "// Date: 2024-01-01", "")
         $lines = ConvertTo-CustomJson -Data $config -HeaderComments $comments
         $json = $lines -join "`n"
+
+    .EXAMPLE
+        $inlineComments = @{ "_metadata" = @("Registry Key Metadata"); "_subkeys" = @("Subkeys") }
+        $lines = ConvertTo-CustomJson -Data $registryData -InlineKeyComments $inlineComments
+        $json = $lines -join "`n"
     #>
     [CmdletBinding()]
     param(
@@ -76,6 +86,9 @@ function ConvertTo-CustomJson {
 
         [Parameter(Mandatory = $false)]
         [string[]]$HeaderComments,
+
+        [Parameter(Mandatory = $false)]
+        [hashtable]$InlineKeyComments,
 
         [Parameter(Mandatory = $false)]
         [int]$IndentLevel = 0
@@ -101,12 +114,19 @@ function ConvertTo-CustomJson {
             $value = $Data[$key]
             $isLast = ($i -eq $keyCount - 1)
 
+            # Add inline comments for specific keys if provided
+            if ($InlineKeyComments -and $InlineKeyComments.ContainsKey($key)) {
+                foreach ($comment in $InlineKeyComments[$key]) {
+                    $lines += "$nextIndent// $comment"
+                }
+            }
+
             $escapedKey = $key -replace '\\', '\\' -replace '"', '\"' -replace "`n", '\n' -replace "`r", '\r' -replace "`t", '\t'
 
             if ($value -is [System.Collections.Specialized.OrderedDictionary] -or $value -is [hashtable]) {
                 $lines += "$nextIndent`"$escapedKey`": {"
 
-                $nestedLines = ConvertTo-CustomJson -Data $value -IndentLevel ($IndentLevel + 2)
+                $nestedLines = ConvertTo-CustomJson -Data $value -IndentLevel ($IndentLevel + 2) -InlineKeyComments $InlineKeyComments
                 # Remove outer braces from nested conversion
                 $nestedContent = $nestedLines | Select-Object -Skip 1 | Select-Object -SkipLast 1
                 $lines += $nestedContent
