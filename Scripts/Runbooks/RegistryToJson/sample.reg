@@ -1,0 +1,99 @@
+Windows Registry Editor Version 5.00
+
+; Sample Registry Export for Testing
+; This file demonstrates various registry value types and structures
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp]
+"ApplicationName"="Sample Application"
+"Version"="1.0.5"
+"InstallPath"="C:\\Program Files\\SampleApp"
+"Enabled"="true"
+"AutoStart"="false"
+"Port"=dword:00001f90
+"Timeout"=dword:0000001e
+"MaxConnections"=dword:00000064
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp\Database]
+; Database configuration settings
+"Host"="localhost"
+"Port"=dword:00001538
+"DatabaseName"="SampleDB"
+"Username"="dbuser"
+"Password"=""
+"ConnectionTimeout"=dword:0000001e
+"RetryCount"=dword:00000003
+"UseSSL"="true"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp\Database\ConnectionPool]
+"MinPoolSize"=dword:00000005
+"MaxPoolSize"=dword:00000032
+"PoolTimeout"=dword:0000003c
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp\Logging]
+"LogLevel"="Info"
+"LogPath"=hex(2):25,00,50,00,72,00,6f,00,67,00,72,00,61,00,6d,00,44,00,61,00,\
+  74,00,61,00,25,00,5c,00,53,00,61,00,6d,00,70,00,6c,00,65,00,41,00,70,00,70,\
+  00,5c,00,4c,00,6f,00,67,00,73,00,00,00
+"MaxLogSize"=qword:0000000100000000
+"EnableConsoleLogging"="true"
+"EnableFileLogging"="true"
+"RotateLogs"="true"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp\Features]
+"EnableBetaFeatures"="false"
+"EnableTelemetry"="true"
+"EnableAutoUpdate"="true"
+"EnableNotifications"="true"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp\Network]
+"ProxyServer"=""
+"ProxyPort"=dword:00000000
+"UseProxy"="false"
+"NetworkTimeout"=dword:00007530
+"MaxRetries"=dword:00000005
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp\UI]
+"Theme"="Dark"
+"Language"="en-US"
+"FontSize"=dword:0000000c
+"ShowWelcomeScreen"="true"
+"WindowWidth"=dword:00000400
+"WindowHeight"=dword:00000300
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp\Paths]
+"SearchPaths"=hex(7):43,00,3a,00,5c,00,50,00,61,00,74,00,68,00,31,00,00,00,43,\
+  00,3a,00,5c,00,50,00,61,00,74,00,68,00,32,00,00,00,43,00,3a,00,5c,00,50,00,\
+  61,00,74,00,68,00,33,00,00,00,00,00
+"TempPath"=hex(2):25,00,54,00,45,00,4d,00,50,00,25,00,5c,00,53,00,61,00,6d,00,\
+  70,00,6c,00,65,00,41,00,70,00,70,00,00,00
+"DataPath"=hex(2):25,00,41,00,50,00,50,00,44,00,41,00,54,00,41,00,25,00,5c,00,\
+  53,00,61,00,6d,00,70,00,6c,00,65,00,41,00,70,00,70,00,5c,00,44,00,61,00,74,\
+  61,00,00,00
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp\Security]
+"EncryptionKey"=hex:41,42,43,44,45,46,47,48,49,4a,4b,4c,4d,4e,4f,50
+"CertificateHash"=hex:5f,3e,2d,1c,0b,9a,88,77,66,55,44,33,22,11,00,ff,ee,dd,\
+  cc,bb
+"UseEncryption"="true"
+"RequireAuthentication"="true"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp\Advanced]
+"CustomBinary"=hex:00,01,02,03,04,05,06,07,08,09,0a,0b,0c,0d,0e,0f,10,11,12,\
+  13,14,15,16,17,18,19,1a,1b,1c,1d,1e,1f
+"LargeNumber"=qword:000000174876e800
+"DebugMode"="false"
+"VerboseLogging"="false"
+"PerformanceMonitoring"="true"
+
+[HKEY_CURRENT_USER\Software\SampleApp\UserPreferences]
+"LastRunDate"="2024-01-15"
+"RunCount"=dword:0000002a
+"UserTheme"="Light"
+"SaveWindowPosition"="true"
+"CheckForUpdates"="true"
+"SendAnalytics"="false"
+
+; Commented out section for testing
+;[HKEY_LOCAL_MACHINE\SOFTWARE\SampleApp\DisabledFeature]
+;"FeatureName"="ExperimentalFeature"
+;"Enabled"="false"
