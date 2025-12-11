@@ -70,5 +70,11 @@ $newContent = for ($i = 0; $i -lt $content.Count; $i++) {
 }
 
 # Write updated content back to file
-$newContent | Set-Content $iniFilePath
-Write-Host "Updated successfully. DefaultCountryCode=$defaultCountryCode"
+try {
+    $newContent | Set-Content $iniFilePath -Encoding Default
+    Write-Host "Updated successfully. DefaultCountryCode=$defaultCountryCode"
+}
+catch {
+    Write-Error "Failed to update $iniFilePath: $($_.Exception.Message)"
+    exit 1
+}
