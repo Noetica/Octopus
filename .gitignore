@@ -1,0 +1,27 @@
+# Ignore all INF files
+*.inf
+
+# Except sample INF files
+!sample.inf
+!**/sample.inf
+
+# Ignore sensitive INF files in any location
+**/synthesys.*.inf
+**/synthesys.inf
+synthesys.*.inf
+synthesys.inf
+
+# Also ignore any files starting with synthesys
+**/synthesys.*
+synthesys.*
+
+# Ignore all REG files
+*.reg
+
+# Except sample REG files
+!sample.reg
+!**/sample.reg
+
+# Ignore sensitive REG files in any location
+**/synthesys.*.reg
+**/synthesys.reg
