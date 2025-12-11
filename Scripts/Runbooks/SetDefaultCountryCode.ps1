@@ -1,6 +1,6 @@
 # Default country code to set/update
 $defaultCountryCode = $OctopusParameters["Tenant.DefaultCountryCode"];
-$iniFilePath = "C:\Synthesys\etc\synthesys.inf"
+$iniFilePath = $OctopusParameters["Noetica.Inf"];
 
 # Validate defaultCountryCode is not empty
 if ([string]::IsNullOrWhiteSpace($defaultCountryCode)) {
