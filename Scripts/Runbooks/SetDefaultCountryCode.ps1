@@ -21,7 +21,7 @@ if (-not (Test-Path $iniFilePath)) {
 }
 
 # Read file and initialize tracking variables
-$content = Get-Content $iniFilePath
+$content = Get-Content $iniFilePath -Encoding Default
 $inSection = $false
 $sectionLine = -1
 $linesToReplace = @()
