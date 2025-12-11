@@ -30,8 +30,8 @@ Write-Host "Scanning $iniFilePath..."
 
 # Scan for [Predictive] section and find DefaultCountryCode lines
 for ($i = 0; $i -lt $content.Count; $i++) {
-    if ($content[$i] -match '^\[Predictive\]') {
-        # Found the [Predictive] section header
+    if ($content[$i] -match '^\s*\[Predictive\]\s*$') {
+        # Found the [Predictive] section header (allowing whitespace)
         $inSection = $true
         $sectionLine = $i
         Write-Host "Found [Predictive] section at line $($i + 1)"
