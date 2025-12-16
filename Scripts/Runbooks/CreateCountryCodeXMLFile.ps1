@@ -1,5 +1,8 @@
-# Default path for country code XML file
-$propertiesFolder = "C:\Synthesys\Etc\Properties\"
+# Set path for etc folder from Octopus parameter
+$etcRoot = $OctopusParameters["Noetica.EtcRoot"]
+
+# Set properties folder path to Properties
+$propertiesFolder = $etcRoot + "\Properties\"
 
 # Check if properties folder exists
 if (-not (Test-Path -Path $propertiesFolder)) {
@@ -45,3 +48,39 @@ catch {
     exit 1
 }
 
+
+# Set properties folder path to OptionalProperties
+$propertiesFolder = $etcRoot + "\OptionalProperties\"
+
+# Set Properties TXT file path
+$propertiesFile = Join-Path -Path $propertiesFolder -ChildPath "Properties.txt"
+
+# Check if CountryCode exists in Properties.txt, add if missing
+$countryCodeExists = $false
+if (Test-Path $propertiesFile) {
+    $content = Get-Content -Path $propertiesFile
+    foreach ($line in $content) {
+        if ($line -eq "CountryCode") {
+            $countryCodeExists = $true
+            break
+        }
+    }
+} else {
+    Write-Host "Properties.txt file does not exist at path: $propertiesFile"
+    exit
+}
+
+if ($countryCodeExists) {
+    Write-Host "CountryCode already exists in Properties.txt"
+    exit
+} else {
+    # Ensure file ends with newline before adding CountryCode
+    $fileContent = [System.IO.File]::ReadAllText($propertiesFile)
+    if (-not $fileContent.EndsWith("`n")) {
+        [System.IO.File]::AppendAllText($propertiesFile, "`r`nCountryCode")
+    } else {
+        [System.IO.File]::AppendAllText($propertiesFile, "CountryCode")
+    }
+    Write-Host "CountryCode added to Properties.txt"
+    exit
+}
