@@ -27,7 +27,7 @@ $xmlContent = @"
 <DisplayName>Country Code</DisplayName>
 <EnabledType>Optional</EnabledType>
 <Enabled>true</Enabled>
-<Modules>OBManager,SynthesysSwitchh,CTI\Interfaces\Mitel,SynCTIIntX</Modules>
+<Modules>OBManager,SynthesysSwitch,CTI\Interfaces\Mitel,SynCTIIntX</Modules>
 <Classes>
 <Class>User</Class>
 <Class>Campaign</Class>
