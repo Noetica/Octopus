@@ -1,0 +1,44 @@
+Windows Registry Editor Version 5.00
+
+; Example Registry Export File
+; This file demonstrates various registry value types for testing WriteRegistryEntries.ps1
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\ExampleApp]
+"ApplicationName"="Example Application"
+"Version"="2.0.0"
+"InstallPath"="C:\\Program Files\\ExampleApp"
+"Enabled"="true"
+"AutoStart"="false"
+"Port"=dword:00001f90
+"Timeout"=dword:0000003c
+"MaxConnections"=dword:00000032
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\ExampleApp\Settings]
+; Application settings section
+"LogLevel"="Information"
+"DebugMode"="false"
+"CacheSize"=dword:00000400
+"RetryAttempts"=dword:00000003
+"ConnectionString"="Server=localhost;Database=ExampleDB"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\ExampleApp\Settings\Advanced]
+"EnableTelemetry"="true"
+"TelemetryEndpoint"="https://telemetry.example.com/api"
+"BufferSize"=qword:0000000010000000
+"CustomFlags"=hex:01,02,03,04,05,06,07,08
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\ExampleApp\Paths]
+"DataPath"=hex(2):25,00,50,00,72,00,6f,00,67,00,72,00,61,00,6d,00,44,00,61,00,\
+  74,00,61,00,25,00,5c,00,45,00,78,00,61,00,6d,00,70,00,6c,00,65,00,41,00,70,\
+  00,70,00,00,00
+"LogPath"=hex(2):25,00,54,00,45,00,4d,00,50,00,25,00,5c,00,45,00,78,00,61,00,\
+  6d,00,70,00,6c,00,65,00,41,00,70,00,70,00,5c,00,4c,00,6f,00,67,00,73,00,00,00
+"SearchPaths"=hex(7):43,00,3a,00,5c,00,50,00,61,00,74,00,68,00,31,00,00,00,43,\
+  00,3a,00,5c,00,50,00,61,00,74,00,68,00,32,00,00,00,00,00
+
+[HKEY_CURRENT_USER\Software\ExampleApp\UserPreferences]
+"Theme"="Dark"
+"Language"="en-US"
+"FontSize"=dword:0000000e
+"ShowNotifications"="true"
+"LastLogin"="2024-01-20T10:30:00Z"
