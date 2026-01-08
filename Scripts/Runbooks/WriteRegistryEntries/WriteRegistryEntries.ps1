@@ -16,15 +16,6 @@
 .PARAMETER Encoding
     File encoding to use when reading the .reg file. Default: Unicode
 
-.NOTES
-    The following parameters are automatically provided by [CmdletBinding(SupportsShouldProcess)]:
-    
-    -WhatIf
-        Shows what changes would be made without actually applying them.
-    
-    -Confirm
-        Prompts for confirmation before applying each registry change.
-
 .EXAMPLE
     .\WriteRegistryEntries.ps1 -RegFilePath "C:\exports\settings.reg"
     Applies all registry entries from settings.reg to the registry.
@@ -39,6 +30,14 @@
 
     Requires administrative privileges for writing to HKEY_LOCAL_MACHINE.
     Run PowerShell as Administrator when modifying machine-level registry keys.
+
+    The following parameters are automatically provided by [CmdletBinding(SupportsShouldProcess)]:
+    
+    -WhatIf
+        Shows what changes would be made without actually applying them.
+    
+    -Confirm
+        Prompts for confirmation before applying each registry change.
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
@@ -85,6 +84,15 @@ function Write-Log {
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     $logEntry = "[$timestamp] [$Level] $Message"
 
+    # Write to console based on log level
+    switch ($Level) {
+        'ERROR'   { Write-Verbose $logEntry -Verbose }
+        'WARNING' { Write-Verbose $logEntry -Verbose }
+        'INFO'    { Write-Verbose $logEntry }
+        'DEBUG'   { Write-Verbose $logEntry }
+    }
+
+    # Write to log file if specified
     if ($LogFile) {
         try {
             Add-Content -Path $LogFile -Value $logEntry -ErrorAction Stop
