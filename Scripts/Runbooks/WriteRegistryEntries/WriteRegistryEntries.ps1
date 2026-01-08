@@ -122,9 +122,7 @@ function ConvertFrom-RegHexString {
     # Convert hex pairs to bytes
     $bytes = [System.Collections.ArrayList]@()
     for ($i = 0; $i -lt $cleanHex.Length; $i += 2) {
-        if ($i + 1 -lt $cleanHex.Length) {
-            $null = $bytes.Add([Convert]::ToByte($cleanHex.Substring($i, 2), 16))
-        }
+        $null = $bytes.Add([Convert]::ToByte($cleanHex.Substring($i, 2), 16))
     }
 
     return [byte[]]$bytes.ToArray()
