@@ -16,14 +16,14 @@
 .PARAMETER Encoding
     File encoding to use when reading the .reg file. Default: Unicode
 
-.PARAMETER WhatIf
-    Shows what changes would be made without actually applying them.
-
-.PARAMETER Confirm
-    Prompts for confirmation before applying each registry change.
-
-.PARAMETER Force
-    Suppresses confirmation prompts and overwrites existing values without warning.
+.NOTES
+    The following parameters are automatically provided by [CmdletBinding(SupportsShouldProcess)]:
+    
+    -WhatIf
+        Shows what changes would be made without actually applying them.
+    
+    -Confirm
+        Prompts for confirmation before applying each registry change.
 
 .EXAMPLE
     .\WriteRegistryEntries.ps1 -RegFilePath "C:\exports\settings.reg"
@@ -32,10 +32,6 @@
 .EXAMPLE
     .\WriteRegistryEntries.ps1 -RegFilePath "C:\exports\settings.reg" -WhatIf
     Shows what registry changes would be made without applying them.
-
-.EXAMPLE
-    .\WriteRegistryEntries.ps1 -RegFilePath "C:\exports\settings.reg" -Force
-    Applies registry entries without prompting for confirmation.
 
 .NOTES
     Author: Created for Octopus project
@@ -48,6 +44,8 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
+    [ValidatePattern('\.reg$', ErrorMessage = "The file must have a .reg extension")]
+    [ValidateNotNullOrEmpty()]
     [string]$RegFilePath,
 
     [Parameter(Mandatory = $false)]
@@ -55,10 +53,40 @@ param(
     [string]$Encoding = 'Unicode',
 
     [Parameter(Mandatory = $false)]
-    [switch]$Force
+    [string]$LogFilePath
 )
 
 #region Helper Functions
+
+function Write-Log {
+    <#
+    .SYNOPSIS
+        Writes a log entry with timestamp and log level.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message,
+
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('INFO', 'WARNING', 'ERROR', 'DEBUG')]
+        [string]$Level = 'INFO',
+
+        [Parameter(Mandatory = $false)]
+        [string]$LogFile
+    )
+
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    $logEntry = "[$timestamp] [$Level] $Message"
+
+    if ($LogFile) {
+        try {
+            Add-Content -Path $LogFile -Value $logEntry -ErrorAction Stop
+        }
+        catch {
+            Write-Warning "Failed to write to log file: $($_.Exception.Message)"
+        }
+    }
+}
 
 function ConvertFrom-RegHexString {
     <#
@@ -209,11 +237,15 @@ function Write-RegistryValue {
     if (-not (Test-Path -LiteralPath $psPath)) {
         if ($PSCmdlet.ShouldProcess($psPath, "Create registry key")) {
             try {
+                Write-Log -Message "Creating registry key: $KeyPath" -Level 'INFO' -LogFile $script:LogFilePath
                 $null = New-Item -Path $psPath -Force -ErrorAction Stop
                 Write-Host "  Created key: $KeyPath" -ForegroundColor Green
+                Write-Log -Message "Successfully created registry key: $KeyPath" -Level 'INFO' -LogFile $script:LogFilePath
             }
             catch {
                 Write-Error "Failed to create registry key '$KeyPath': $($_.Exception.Message)"
+                Write-Log -Message "Failed to create registry key '$KeyPath': $($_.Exception.Message)" -Level 'ERROR' -LogFile $script:LogFilePath
+                Write-Log -Message "Exception details: $($_.Exception.ToString())" -Level 'ERROR' -LogFile $script:LogFilePath
                 return $false
             }
         }
@@ -232,12 +264,21 @@ function Write-RegistryValue {
 
     if ($PSCmdlet.ShouldProcess("$KeyPath\$displayName", "Set registry value to '$displayValue' ($ValueType)")) {
         try {
+            Write-Log -Message "Setting registry value: $KeyPath\$displayName = $displayValue ($ValueType)" -Level 'INFO' -LogFile $script:LogFilePath
             Set-ItemProperty -LiteralPath $psPath -Name $ValueName -Value $ValueData -Type $valueKind -Force -ErrorAction Stop
             Write-Host "  Set value: $displayName = $displayValue ($ValueType)" -ForegroundColor Cyan
+            Write-Log -Message "Successfully set registry value: $KeyPath\$displayName" -Level 'INFO' -LogFile $script:LogFilePath
             return $true
         }
         catch {
             Write-Error "Failed to set registry value '$displayName' in '$KeyPath': $($_.Exception.Message)"
+            Write-Error "Exception details: $($_.Exception.ToString())"
+            Write-Log -Message "Failed to set registry value '$displayName' in '$KeyPath': $($_.Exception.Message)" -Level 'ERROR' -LogFile $script:LogFilePath
+            Write-Log -Message "Exception details: $($_.Exception.ToString())" -Level 'ERROR' -LogFile $script:LogFilePath
+            if ($_.Exception.InnerException) {
+                Write-Error "Inner exception: $($_.Exception.InnerException.ToString())"
+                Write-Log -Message "Inner exception: $($_.Exception.InnerException.ToString())" -Level 'ERROR' -LogFile $script:LogFilePath
+            }
             return $false
         }
     }
@@ -249,21 +290,42 @@ function Write-RegistryValue {
 
 #region Main Script
 
+# Initialize script-level log file path variable
+$script:LogFilePath = $LogFilePath
+
+# Log script start
+Write-Log -Message "======================================" -Level 'INFO' -LogFile $script:LogFilePath
+Write-Log -Message "WriteRegistryEntries.ps1 - Script Started" -Level 'INFO' -LogFile $script:LogFilePath
+Write-Log -Message "Parameters: RegFilePath=$RegFilePath, Encoding=$Encoding, LogFilePath=$LogFilePath" -Level 'INFO' -LogFile $script:LogFilePath
+Write-Log -Message "Executed by: $env:USERNAME on $env:COMPUTERNAME" -Level 'INFO' -LogFile $script:LogFilePath
+Write-Log -Message "======================================" -Level 'INFO' -LogFile $script:LogFilePath
+
 # Validate input file exists
 if (-not (Test-Path -LiteralPath $RegFilePath)) {
     Write-Error "Registry file not found: $RegFilePath"
+    Write-Log -Message "Registry file not found: $RegFilePath" -Level 'ERROR' -LogFile $script:LogFilePath
     exit 1
 }
 
 Write-Host "Reading registry file: $RegFilePath" -ForegroundColor Yellow
+Write-Log -Message "Reading registry file: $RegFilePath" -Level 'INFO' -LogFile $script:LogFilePath
 Write-Host ""
 
 # Read file with appropriate encoding
 try {
+    Write-Log -Message "Reading file with encoding: $Encoding" -Level 'DEBUG' -LogFile $script:LogFilePath
     $lines = Get-Content -LiteralPath $RegFilePath -Encoding $Encoding -ErrorAction Stop
+    Write-Log -Message "Successfully read $($lines.Count) lines from file" -Level 'INFO' -LogFile $script:LogFilePath
 }
 catch {
     Write-Error "Failed to read registry file: $($_.Exception.Message)"
+    Write-Error "Exception details: $($_.Exception.ToString())"
+    Write-Log -Message "Failed to read registry file: $($_.Exception.Message)" -Level 'ERROR' -LogFile $script:LogFilePath
+    Write-Log -Message "Exception details: $($_.Exception.ToString())" -Level 'ERROR' -LogFile $script:LogFilePath
+    if ($_.Exception.InnerException) {
+        Write-Error "Inner exception: $($_.Exception.InnerException.ToString())"
+        Write-Log -Message "Inner exception: $($_.Exception.InnerException.ToString())" -Level 'ERROR' -LogFile $script:LogFilePath
+    }
     exit 1
 }
 
@@ -272,12 +334,14 @@ $headerFound = $false
 foreach ($line in $lines) {
     if ($line -match '^Windows Registry Editor') {
         $headerFound = $true
+        Write-Log -Message "Found valid registry file header: $line" -Level 'INFO' -LogFile $script:LogFilePath
         break
     }
 }
 
 if (-not $headerFound) {
     Write-Error "Invalid registry file format. Missing 'Windows Registry Editor' header."
+    Write-Log -Message "Invalid registry file format. Missing 'Windows Registry Editor' header." -Level 'ERROR' -LogFile $script:LogFilePath
     exit 1
 }
 
@@ -321,14 +385,19 @@ foreach ($line in $lines) {
         $currentKey = $matches[1]
         $keyCount++
         Write-Host "Processing key: $currentKey" -ForegroundColor White
+        Write-Log -Message "Processing registry key [$keyCount]: $currentKey" -Level 'INFO' -LogFile $script:LogFilePath
         continue
     }
 
-    # Check if this is a continuation line
-    $isContinuation = $trimmedLine -match '^[0-9a-fA-F,\s]+\\?$' -and $null -ne $pendingValueName
+    # Check if this is a continuation line (hex data that continues from previous line)
+    # Continuation lines are indented and contain hex pairs, and the previous line ended with backslash
+    $isContinuation = $trimmedLine -match '^[0-9A-Fa-f]{2}(?:,[0-9A-Fa-f]{2})*' -and $null -ne $pendingValueName
 
     if ($isContinuation) {
-        $pendingHexData += $trimmedLine
+        # Remove trailing backslash if present
+        $continuationData = $trimmedLine -replace '\\$', ''
+        $pendingHexData += $continuationData
+        Write-Log -Message "Appending continuation data for '$pendingValueName'" -Level 'DEBUG' -LogFile $script:LogFilePath
         continue
     }
 
@@ -346,9 +415,11 @@ foreach ($line in $lines) {
     }
 
     # Handle value assignments
-    if ($trimmedLine -match '^"?([^"=]+)"?\s*=\s*(.+)$') {
-        $valueName = $matches[1]
-        $valueData = $matches[2].Trim()
+    # Pattern matches either: "quoted name"=value OR unquoted_name=value OR @=value
+    if ($trimmedLine -match '^(?:"([^"]+)"|([^=]+?))\s*=\s*(.+)$') {
+        # Value name is in either $matches[1] (quoted) or $matches[2] (unquoted)
+        $valueName = if ($matches[1]) { $matches[1] } else { $matches[2].Trim() }
+        $valueData = $matches[3].Trim()
 
         # Handle default value
         if ($valueName -eq '@') {
@@ -358,6 +429,7 @@ foreach ($line in $lines) {
         # Skip if no current key is set
         if ($null -eq $currentKey) {
             Write-Warning "Skipping value '$valueName' - no registry key context"
+            Write-Log -Message "Skipping value '$valueName' - no registry key context" -Level 'WARNING' -LogFile $script:LogFilePath
             continue
         }
 
@@ -380,25 +452,25 @@ foreach ($line in $lines) {
                 $errorCount++
             }
         }
-        elseif ($valueData -match '^hex\(b\):(.+)$') {
+        elseif ($valueData -match '^hex\(b\):(.+?)(?:\\)?$') {
             # REG_QWORD (might be multi-line)
             $pendingValueName = $valueName
             $pendingValueType = 'qword'
             $pendingHexData = $matches[1]
         }
-        elseif ($valueData -match '^hex\(2\):(.+)$') {
+        elseif ($valueData -match '^hex\(2\):(.+?)(?:\\)?$') {
             # REG_EXPAND_SZ (might be multi-line)
             $pendingValueName = $valueName
             $pendingValueType = 'expand_sz'
             $pendingHexData = $matches[1]
         }
-        elseif ($valueData -match '^hex\(7\):(.+)$') {
+        elseif ($valueData -match '^hex\(7\):(.+?)(?:\\)?$') {
             # REG_MULTI_SZ (might be multi-line)
             $pendingValueName = $valueName
             $pendingValueType = 'multi_sz'
             $pendingHexData = $matches[1]
         }
-        elseif ($valueData -match '^hex:(.+)$') {
+        elseif ($valueData -match '^hex:(.+?)(?:\\)?$') {
             # REG_BINARY (might be multi-line)
             $pendingValueName = $valueName
             $pendingValueType = 'binary'
@@ -406,6 +478,7 @@ foreach ($line in $lines) {
         }
         else {
             Write-Warning "Unknown value format for '$valueName': $valueData"
+            Write-Log -Message "Unknown value format for '$valueName': $valueData" -Level 'WARNING' -LogFile $script:LogFilePath
         }
     }
 }
@@ -430,12 +503,24 @@ Write-Host "Values succeeded:   $successCount" -ForegroundColor Green
 Write-Host "Values failed:      $errorCount" -ForegroundColor $(if ($errorCount -gt 0) { 'Red' } else { 'White' })
 Write-Host "========================================" -ForegroundColor Yellow
 
+# Log summary
+Write-Log -Message "======================================" -Level 'INFO' -LogFile $script:LogFilePath
+Write-Log -Message "Registry Import Summary" -Level 'INFO' -LogFile $script:LogFilePath
+Write-Log -Message "Keys processed: $keyCount" -Level 'INFO' -LogFile $script:LogFilePath
+Write-Log -Message "Values succeeded: $successCount" -Level 'INFO' -LogFile $script:LogFilePath
+Write-Log -Message "Values failed: $errorCount" -Level $(if ($errorCount -gt 0) { 'ERROR' } else { 'INFO' }) -LogFile $script:LogFilePath
+Write-Log -Message "======================================" -Level 'INFO' -LogFile $script:LogFilePath
+
 if ($errorCount -gt 0) {
     Write-Warning "Some registry entries failed to apply. Run as Administrator if modifying HKEY_LOCAL_MACHINE keys."
+    Write-Log -Message "Script completed with errors. Some registry entries failed to apply." -Level 'ERROR' -LogFile $script:LogFilePath
+    Write-Log -Message "WriteRegistryEntries.ps1 - Script Ended with Exit Code 1" -Level 'ERROR' -LogFile $script:LogFilePath
     exit 1
 }
 
 Write-Host "Registry entries applied successfully." -ForegroundColor Green
+Write-Log -Message "Registry entries applied successfully." -Level 'INFO' -LogFile $script:LogFilePath
+Write-Log -Message "WriteRegistryEntries.ps1 - Script Ended with Exit Code 0" -Level 'INFO' -LogFile $script:LogFilePath
 exit 0
 
 #endregion
