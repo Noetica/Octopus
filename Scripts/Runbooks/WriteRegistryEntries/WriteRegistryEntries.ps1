@@ -114,6 +114,11 @@ function ConvertFrom-RegHexString {
     # Remove whitespace, commas, and backslashes
     $cleanHex = $HexString -replace '[\s,\\]', ''
 
+    # Validate that hex string has even number of characters
+    if ($cleanHex.Length -gt 0 -and ($cleanHex.Length % 2) -ne 0) {
+        throw "Invalid hex string: odd number of characters ($($cleanHex.Length)). Hex data must consist of complete byte pairs. Data: '$cleanHex'"
+    }
+
     # Convert hex pairs to bytes
     $bytes = [System.Collections.ArrayList]@()
     for ($i = 0; $i -lt $cleanHex.Length; $i += 2) {
