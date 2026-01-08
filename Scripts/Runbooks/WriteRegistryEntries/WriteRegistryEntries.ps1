@@ -539,8 +539,14 @@ Write-Host "Registry entries applied successfully." -ForegroundColor Green
 Write-Log -Message "Registry entries applied successfully." -Level 'INFO' -LogFile $script:LogFilePath
 Write-Log -Message "WriteRegistryEntries.ps1 - Script Ended with Exit Code 0" -Level 'INFO' -LogFile $script:LogFilePath
 
-Write-Output "Starting VoicePlatform"
-Use-SCM -target 'VoicePlatform' -operation 'Start'
+if ($PSCmdlet -and $PSCmdlet.ShouldProcess("VoicePlatform service", "Start")) {
+    Write-Output "Starting VoicePlatform"
+    Use-SCM -target 'VoicePlatform' -operation 'Start'
+}
+elseif (-not $PSCmdlet) {
+    Write-Output "Starting VoicePlatform"
+    Use-SCM -target 'VoicePlatform' -operation 'Start'
+}
 exit 0
 
 #endregion
