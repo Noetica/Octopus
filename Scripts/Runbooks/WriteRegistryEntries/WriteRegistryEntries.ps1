@@ -56,7 +56,6 @@ param(
 )
 
 Write-Output "The script is running from: $PSScriptRoot"
-. "$PSScriptRoot\utils\file-logger.ps1"
 . "$PSScriptRoot\utils\control-scm.ps1"
 
 if ($PSCmdlet.ShouldProcess('XChange service', 'Stop')) {
