@@ -59,8 +59,10 @@ Write-Output "The script is running from: $PSScriptRoot"
 . "$PSScriptRoot\utils\file-logger.ps1"
 . "$PSScriptRoot\utils\control-scm.ps1"
 
-Write-Output "Stopping XChange"
-Use-SCM -target 'XChange' -operation 'Stop'
+if ($PSCmdlet.ShouldProcess('XChange service', 'Stop')) {
+    Write-Output "Stopping XChange"
+    Use-SCM -target 'XChange' -operation 'Stop'
+}
 
 #region Helper Functions
 
