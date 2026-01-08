@@ -58,11 +58,6 @@ param(
 Write-Output "The script is running from: $PSScriptRoot"
 . "$PSScriptRoot\utils\control-scm.ps1"
 
-if ($PSCmdlet.ShouldProcess('XChange service', 'Stop')) {
-    Write-Output "Stopping XChange"
-    Use-SCM -target 'XChange' -operation 'Stop'
-}
-
 #region Helper Functions
 
 function Write-Log {
@@ -359,6 +354,12 @@ if (-not $headerFound) {
     Write-Error "Invalid registry file format. Missing 'Windows Registry Editor' header."
     Write-Log -Message "Invalid registry file format. Missing 'Windows Registry Editor' header." -Level 'ERROR' -LogFile $script:LogFilePath
     exit 1
+}
+
+# All validations passed - now stop the service
+if ($PSCmdlet.ShouldProcess('XChange service', 'Stop')) {
+    Write-Output "Stopping XChange"
+    Use-SCM -target 'XChange' -operation 'Stop'
 }
 
 # Parse and apply registry entries
