@@ -534,19 +534,25 @@ if ($errorCount -gt 0) {
     Write-Log -Message "WriteRegistryEntries.ps1 - Script Ended with Exit Code 1" -Level 'ERROR' -LogFile $script:LogFilePath
     exit 1
 }
+$exitCode = 0
 
-Write-Host "Registry entries applied successfully." -ForegroundColor Green
-Write-Log -Message "Registry entries applied successfully." -Level 'INFO' -LogFile $script:LogFilePath
-Write-Log -Message "WriteRegistryEntries.ps1 - Script Ended with Exit Code 0" -Level 'INFO' -LogFile $script:LogFilePath
-
-if ($PSCmdlet -and $PSCmdlet.ShouldProcess("VoicePlatform service", "Start")) {
+try {
+    if ($errorCount -gt 0) {
+        Write-Warning "Some registry entries failed to apply. Run as Administrator if modifying HKEY_LOCAL_MACHINE keys."
+        Write-Log -Message "Script completed with errors. Some registry entries failed to apply." -Level 'ERROR' -LogFile $script:LogFilePath
+        Write-Log -Message "WriteRegistryEntries.ps1 - Script Ended with Exit Code 1" -Level 'ERROR' -LogFile $script:LogFilePath
+        $exitCode = 1
+    }
+    else {
+        Write-Host "Registry entries applied successfully." -ForegroundColor Green
+        Write-Log -Message "Registry entries applied successfully." -Level 'INFO' -LogFile $script:LogFilePath
+        Write-Log -Message "WriteRegistryEntries.ps1 - Script Ended with Exit Code 0" -Level 'INFO' -LogFile $script:LogFilePath
+        $exitCode = 0
+    }
+}
+finally {
     Write-Output "Starting VoicePlatform"
     Use-SCM -target 'VoicePlatform' -operation 'Start'
+    exit $exitCode
 }
-elseif (-not $PSCmdlet) {
-    Write-Output "Starting VoicePlatform"
-    Use-SCM -target 'VoicePlatform' -operation 'Start'
-}
-exit 0
-
 #endregion
