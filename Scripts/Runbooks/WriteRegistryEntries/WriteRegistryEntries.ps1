@@ -56,6 +56,13 @@ param(
     [string]$LogFilePath
 )
 
+Write-Output "The script is running from: $PSScriptRoot"
+. "$PSScriptRoot\utils\file-logger.ps1"
+. "$PSScriptRoot\utils\control-scm.ps1"
+
+Write-Output "Stopping XChange"
+Use-SCM -target 'XChange' -operation 'Stop'
+
 #region Helper Functions
 
 function Write-Log {
@@ -521,6 +528,9 @@ if ($errorCount -gt 0) {
 Write-Host "Registry entries applied successfully." -ForegroundColor Green
 Write-Log -Message "Registry entries applied successfully." -Level 'INFO' -LogFile $script:LogFilePath
 Write-Log -Message "WriteRegistryEntries.ps1 - Script Ended with Exit Code 0" -Level 'INFO' -LogFile $script:LogFilePath
+
+Write-Output "Starting VoicePlatform"
+Use-SCM -target 'VoicePlatform' -operation 'Start'
 exit 0
 
 #endregion
