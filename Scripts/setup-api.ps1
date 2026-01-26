@@ -90,6 +90,9 @@ function DeployLatestArtifact() {
             $logger.Log('Debug', "Target: ($destinationPath)")
             try {
                 Copy-Item -Path $item.FullName -Destination $destinationPath -Force -ErrorAction Stop
+                # Belt and braces - this should always succeed, but nice to see
+                # it logging the new file has been copied. If it fails, it should 
+                # go direct to the exception.
                 if (Test-Path $destinationPath) {
                     $logger.Log('Info', 'Copied successfully.')
                     $copiedFileCount++
