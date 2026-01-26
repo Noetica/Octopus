@@ -88,13 +88,22 @@ function DeployLatestArtifact() {
             $logger.Log('Info', "Copying ($($item.Name))...")
             $logger.Log('Debug', "Source: ($($item.FullName))")
             $logger.Log('Debug', "Target: ($destinationPath)")
-            Copy-Item -Path $item.FullName -Destination $destinationPath -Force
-            if (Test-Path $destinationPath) {
-                $logger.Log('Info', 'Copied successfully.')
-                $copiedFileCount++
+            try {
+                Copy-Item -Path $item.FullName -Destination $destinationPath -Force -ErrorAction Stop
+                # Belt and braces - this should always succeed, but nice to see
+                # it logging the new file has been copied. If it fails, it should 
+                # go direct to the exception.
+                if (Test-Path $destinationPath) {
+                    $logger.Log('Info', 'Copied successfully.')
+                    $copiedFileCount++
+                }
+                else {
+                    $logger.Log('Critical', "File not copied. ($($item.FullName))")
+                    exit 1
+                }
             }
-            else {
-                $logger.Log('Critical', "File not copied. ($(item.FullName))")
+            catch {
+                $logger.Log('Critical', "Failed to copy file. ($($item.FullName)) - $_")
                 exit 1
             }
         }
