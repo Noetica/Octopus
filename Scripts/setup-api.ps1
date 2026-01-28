@@ -215,6 +215,30 @@ $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
 if ($processes.Count -gt 0) {
     $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
     $logger.Log('Warn', "Process '$processName.exe' still running after $maxWaitSeconds seconds: $($processes.Count) instance(s) with PID(s) $pids")
+    
+    # Attempt to force-terminate any remaining process instances
+    $logger.Log('Warn', "Attempting to force-terminate remaining process(es)...")
+    $processes | ForEach-Object {
+        try {
+            Stop-Process -Id $_.Id -Force -ErrorAction Stop
+            $logger.Log('Info', "Force-terminated PID $($_.Id)")
+        }
+        catch {
+            $logger.Log('Error', "Failed to force-terminate PID $($_.Id): $($_.Exception.Message)")
+        }
+    }
+    
+    # Give the OS a moment to clean up after forced termination
+    Start-Sleep -Seconds 2
+    
+    # Verify all processes are now gone - fail deployment if any remain
+    $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+    if ($processes.Count -gt 0) {
+        $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
+        $logger.Log('Critical', "Unable to terminate process(es) after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
+        exit 1
+    }
+    $logger.Log('Info', "All processes successfully terminated")
 } else {
     $logger.Log('Info', "Process '$processName.exe' has fully terminated")
 }
