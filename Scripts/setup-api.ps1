@@ -38,24 +38,43 @@ function DeployLatestArtifact() {
             Where-Object { $_.FullName -notin ($exclusions | ForEach-Object { Join-Path $script:targetDir $_ }) } |
                 ForEach-Object {
                     $totalToDeleteCount++
+                    $currentItem = $_  # Capture the item reference before try-catch
+                    $currentPath = $_.FullName
+                    $itemType = if ($currentItem.PSIsContainer) { "Directory" } else { "File" }
+                    $logger.Log('Debug', "Attempting to delete $itemType: $currentPath")
                     try {
-                        Remove-Item -Path $_.FullName -Force -Recurse
-                        $logger.Log('Debug', "Deleted successfully. ($($_.FullName))")
+                        Remove-Item -LiteralPath $currentPath -Force -Recurse -ErrorAction Stop
+                        $logger.Log('Debug', "Deleted successfully. ($currentPath)")
                         $deletedFileCount++
                     }
                     catch {
-                        # Collect errors instead of exiting
-                        $errorList += "Not deleted. $($_.FullName) - $_"
-                        $logger.Log('Critical', "Not deleted. ($($_.FullName))")
+                        # Collect errors with full details
+                        $errorMessage = "Failed to delete: $currentPath | Error: $($_.Exception.Message)"
+                        $errorList += $errorMessage
+                        $logger.Log('Error', $errorMessage)
+                        # Log additional details if available
+                        if ($_.Exception.InnerException) {
+                            $logger.Log('Debug', "Inner exception: $($_.Exception.InnerException.Message)")
+                        }
                     }
                 }
         $logger.Log('Debug', "Cleared $deletedFileCount of $totalToDeleteCount")
 
         # After the loop, if there are errors, output them and exit with code 1
         if ($errorList.Count -gt 0) {
-            $logger.Log('Debug', 'Error(s) occurred during deletion:')
-            $errorList | ForEach-Object { $logger.Log('Critical', $_) }
+            $logger.Log('Error', "===== DELETION ERRORS SUMMARY =====")
+            $logger.Log('Error', "Failed to delete $($errorList.Count) item(s) out of $totalToDeleteCount")
+            $logger.Log('Error', "Successfully deleted: $deletedFileCount")
+            $logger.Log('Error', "-----------------------------------")
+            $logger.Log('Error', "Details of failed deletions:")
+            $errorList | ForEach-Object { $logger.Log('Error', $_) }
+            $logger.Log('Error', "===================================")
+            $logger.Log('Error', "Common causes: Files in use by running processes, insufficient permissions, or locked files.")
+            $logger.Log('Error', "Suggestion: Ensure the service is fully stopped and no processes are using the files.")
             exit 1
+        }
+        else {
+            $logger.Log('Info', "All files were successfully deleted. ($deletedFileCount items removed)")
         }
     }
 
