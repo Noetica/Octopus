@@ -62,15 +62,15 @@ function DeployLatestArtifact() {
 
         # After the loop, if there are errors, output them and exit with code 1
         if ($errorList.Count -gt 0) {
-            $logger.Log('Critical', "===== DELETION ERRORS SUMMARY =====")
-            $logger.Log('Critical', "Failed to delete $($errorList.Count) item(s) out of $totalToDeleteCount")
-            $logger.Log('Critical', "Successfully deleted: $deletedFileCount")
-            $logger.Log('Critical', "-----------------------------------")
-            $logger.Log('Critical', "Details of failed deletions:")
-            $errorList | ForEach-Object { $logger.Log('Critical', $_) }
-            $logger.Log('Critical', "===================================")
-            $logger.Log('Critical', "Common causes: Files in use by running processes, insufficient permissions, or locked files.")
-            $logger.Log('Critical', "Suggestion: Ensure the service is fully stopped and no processes are using the files.")
+            $logger.Log('Error', "===== DELETION ERRORS SUMMARY =====")
+            $logger.Log('Error', "Failed to delete $($errorList.Count) item(s) out of $totalToDeleteCount")
+            $logger.Log('Error', "Successfully deleted: $deletedFileCount")
+            $logger.Log('Error', "-----------------------------------")
+            $logger.Log('Error', "Details of failed deletions:")
+            $errorList | ForEach-Object { $logger.Log('Error', $_) }
+            $logger.Log('Error', "===================================")
+            $logger.Log('Error', "Common causes: Files in use by running processes, insufficient permissions, or locked files.")
+            $logger.Log('Error', "Suggestion: Ensure the service is fully stopped and no processes are using the files.")
             exit 1
         }
         else {
