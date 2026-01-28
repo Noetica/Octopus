@@ -51,7 +51,7 @@ function DeployLatestArtifact() {
                         # Collect errors with full details
                         $errorMessage = "Failed to delete: $currentPath | Error: $($_.Exception.Message)"
                         $errorList += $errorMessage
-                        $logger.Log('Critical', $errorMessage)
+                        $logger.Log('Error', $errorMessage)
                         # Log additional details if available
                         if ($_.Exception.InnerException) {
                             $logger.Log('Debug', "Inner exception: $($_.Exception.InnerException.Message)")
