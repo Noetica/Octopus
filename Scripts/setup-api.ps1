@@ -41,7 +41,7 @@ function DeployLatestArtifact() {
                     $currentItem = $_  # Capture the item reference before try-catch
                     $currentPath = $_.FullName
                     $itemType = if ($currentItem.PSIsContainer) { "Directory" } else { "File" }
-                    $logger.Log('Debug', "Attempting to delete $itemType: $currentPath")
+                    $logger.Log('Debug', "Attempting to delete ${itemType}: $currentPath")
                     try {
                         Remove-Item -LiteralPath $currentPath -Force -Recurse -ErrorAction Stop
                         $logger.Log('Debug', "Deleted successfully. ($currentPath)")
