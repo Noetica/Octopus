@@ -187,26 +187,34 @@ Stop-Service -targets $script:appName
 
 # Wait for the actual process to fully terminate and release file locks
 # The service may report as "Stopped" but the process can still be shutting down
+# Note: We handle multiple instances in case of previous failures or manual starts
 $processName = $script:appName
 $maxWaitSeconds = 10
 $waitInterval = 1
 $waited = 0
 
 $logger.Log('Info', "Waiting for process '$processName.exe' to fully exit...")
+# Loop up to maxWaitSeconds, checking every waitInterval if the process has exited
 while ($waited -lt $maxWaitSeconds) {
-    $process = Get-Process -Name $processName -ErrorAction SilentlyContinue
-    if (-not $process) {
+    $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+    if ($processes.Count -eq 0) {
         $logger.Log('Info', "Process exited after $waited seconds")
         break
+    }
+    if ($processes.Count -gt 1) {
+        # Log warning if multiple instances found - this is unexpected but we'll wait for all to exit
+        $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
+        $logger.Log('Warn', "Multiple instances detected ($($processes.Count)): PIDs $pids")
     }
     Start-Sleep -Seconds $waitInterval
     $waited += $waitInterval
 }
 
-# Final check to confirm process termination
-$process = Get-Process -Name $processName -ErrorAction SilentlyContinue
-if ($process) {
-    $logger.Log('Warn', "Process '$processName.exe' (PID: $($process.Id)) is still running after $maxWaitSeconds seconds")
+# Final check to confirm all process instances have terminated
+$processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+if ($processes.Count -gt 0) {
+    $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
+    $logger.Log('Warn', "Process '$processName.exe' still running after $maxWaitSeconds seconds: $($processes.Count) instance(s) with PID(s) $pids")
 } else {
     $logger.Log('Info', "Process '$processName.exe' has fully terminated")
 }
