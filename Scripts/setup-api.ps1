@@ -180,7 +180,38 @@ $startupScript
 }
 
 $logger = File-Logger  # Use File-Logger util
+
+# Stop the service using the control-service utility
+$logger.Log('Info', "Stopping service: $script:appName")
 Stop-Service -targets $script:appName
+
+# Wait for the actual process to fully terminate and release file locks
+# The service may report as "Stopped" but the process can still be shutting down
+$processName = $script:appName
+$maxWaitSeconds = 10
+$waitInterval = 1
+$waited = 0
+
+$logger.Log('Info', "Waiting for process '$processName.exe' to fully exit...")
+while ($waited -lt $maxWaitSeconds) {
+    $process = Get-Process -Name $processName -ErrorAction SilentlyContinue
+    if (-not $process) {
+        $logger.Log('Info', "Process exited after $waited seconds")
+        break
+    }
+    Start-Sleep -Seconds $waitInterval
+    $waited += $waitInterval
+}
+
+# Final check to confirm process termination
+$process = Get-Process -Name $processName -ErrorAction SilentlyContinue
+if ($process) {
+    $logger.Log('Warn', "Process '$processName.exe' (PID: $($process.Id)) is still running after $maxWaitSeconds seconds")
+} else {
+    $logger.Log('Info', "Process '$processName.exe' has fully terminated")
+}
+
+# Now safe to proceed with file operations
 DeployLatestArtifact -exclusions $FileExclusions
 $logger.Log('Debug', "Startup script selection")
 $logger.Log('Debug', "DefaultPort: [($DefaultPort)]")
