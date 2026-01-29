@@ -211,16 +211,21 @@ if (-not [string]::IsNullOrEmpty($script:startupScript)) {
         $executablePath = $matches[1]
         $firstArg = $matches[2]
         
-        # Extract just the process name without path or extension
-        $processName = [System.IO.Path]::GetFileNameWithoutExtension($executablePath)
-        
-        # Check if this is a dotnet application
-        if ($processName -eq 'dotnet' -and $firstArg -like '*.dll') {
-            $isDotnetApp = $true
-            $dllName = [System.IO.Path]::GetFileName($firstArg)
-            $logger.Log('Info', "Detected dotnet application from startup script. Will filter processes by DLL: '$dllName'")
+        # Validate that we actually captured an executable path
+        if (-not [string]::IsNullOrEmpty($executablePath)) {
+            # Extract just the process name without path or extension
+            $processName = [System.IO.Path]::GetFileNameWithoutExtension($executablePath)
+            
+            # Check if this is a dotnet application
+            if ($processName -eq 'dotnet' -and $firstArg -like '*.dll') {
+                $isDotnetApp = $true
+                $dllName = [System.IO.Path]::GetFileName($firstArg)
+                $logger.Log('Info', "Detected dotnet application from startup script. Will filter processes by DLL: '$dllName'")
+            } else {
+                $logger.Log('Info', "Extracted process name from startup script: '$processName'")
+            }
         } else {
-            $logger.Log('Info', "Extracted process name from startup script: '$processName'")
+            $logger.Log('Warn', "Startup script matched pattern but executable path is empty. Using service name: '$processName'")
         }
     } else {
         $logger.Log('Warn', "Could not parse startup script to extract process name. Using service name: '$processName'")
