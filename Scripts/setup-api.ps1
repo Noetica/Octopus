@@ -242,19 +242,24 @@ if (-not [string]::IsNullOrEmpty($script:startupScript)) {
 
 # Helper function to retrieve target processes based on app type
 function Get-TargetProcesses {
-    if ($isDotnetApp) {
+    param (
+        [bool]$IsDotnetApp,
+        [string]$ProcessName,
+        [string]$DllName
+    )
+    if ($IsDotnetApp) {
         # For dotnet apps, filter by command line containing the specific DLL
-        if ([string]::IsNullOrEmpty($dllName)) {
+        if ([string]::IsNullOrEmpty($DllName)) {
             $logger.Log('Error', "Cannot filter dotnet processes: DLL name is empty. This would match all dotnet.exe processes.")
             return @()
         }
         # Use regex matching with delimiters to avoid matching DLL names embedded in longer names
-        $escapedDllName = [regex]::Escape($dllName)
+        $escapedDllName = [regex]::Escape($DllName)
         return @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue | 
             Where-Object { $_.CommandLine -match "[\s`"]$escapedDllName[\s`"]" })
     } else {
         # For native executables, just get by process name
-        return @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+        return @(Get-Process -Name $ProcessName -ErrorAction SilentlyContinue)
     }
 }
 
@@ -271,7 +276,7 @@ if ($isDotnetApp -and -not [string]::IsNullOrEmpty($dllName)) {
 }
 # Loop up to maxWaitSeconds, checking every waitInterval if the process has exited
 while ($waited -lt $maxWaitSeconds) {
-    $processes = Get-TargetProcesses
+    $processes = Get-TargetProcesses -IsDotnetApp $isDotnetApp -ProcessName $processName -DllName $dllName
     if ($processes.Count -eq 0) {
         $logger.Log('Info', "Process exited after $waited seconds")
         break
@@ -290,7 +295,7 @@ while ($waited -lt $maxWaitSeconds) {
 }
 
 # Final check to confirm all process instances have terminated
-$processes = Get-TargetProcesses
+$processes = Get-TargetProcesses -IsDotnetApp $isDotnetApp -ProcessName $processName -DllName $dllName
 
 if ($processes.Count -gt 0) {
     if ($isDotnetApp) {
@@ -336,7 +341,7 @@ if ($processes.Count -gt 0) {
     Start-Sleep -Seconds 2
     
     # Verify all processes are now gone - fail deployment if any remain
-    $processes = Get-TargetProcesses
+    $processes = Get-TargetProcesses -IsDotnetApp $isDotnetApp -ProcessName $processName -DllName $dllName
     if ($isDotnetApp) {
         if ($processes.Count -gt 0) {
             $pids = ($processes | ForEach-Object { $_.ProcessId }) -join ', '
