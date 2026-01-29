@@ -244,6 +244,10 @@ if (-not [string]::IsNullOrEmpty($script:startupScript)) {
 function Get-TargetProcesses {
     if ($isDotnetApp) {
         # For dotnet apps, filter by command line containing the specific DLL
+        if ([string]::IsNullOrEmpty($dllName)) {
+            $logger.Log('Error', "Cannot filter dotnet processes: DLL name is empty. This would match all dotnet.exe processes.")
+            return @()
+        }
         return @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue | 
             Where-Object { $_.CommandLine -like "*$dllName*" })
     } else {
@@ -256,10 +260,10 @@ $maxWaitSeconds = 10
 $waitInterval = 1
 $waited = 0
 
-if ($isDotnetApp -and $dllName) {
+if ($isDotnetApp -and -not [string]::IsNullOrEmpty($dllName)) {
     $logger.Log('Info', "Waiting for dotnet process hosting '$dllName' to fully exit...")
 } elseif ($isDotnetApp) {
-    $logger.Log('Info', "Waiting for dotnet process to fully exit...")
+    $logger.Log('Info', "Waiting for dotnet process to fully exit (DLL name unknown)...")
 } else {
     $logger.Log('Info', "Waiting for process '$processName.exe' to fully exit...")
 }
