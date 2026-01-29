@@ -229,6 +229,18 @@ if (-not [string]::IsNullOrEmpty($script:startupScript)) {
     $logger.Log('Info', "No startup script provided. Using service name as process name: '$processName'")
 }
 
+# Helper function to retrieve target processes based on app type
+function Get-TargetProcesses {
+    if ($isDotnetApp) {
+        # For dotnet apps, filter by command line containing the specific DLL
+        return @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue | 
+            Where-Object { $_.CommandLine -like "*$dllName*" })
+    } else {
+        # For native executables, just get by process name
+        return @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+    }
+}
+
 $maxWaitSeconds = 10
 $waitInterval = 1
 $waited = 0
@@ -242,14 +254,7 @@ if ($isDotnetApp -and $dllName) {
 }
 # Loop up to maxWaitSeconds, checking every waitInterval if the process has exited
 while ($waited -lt $maxWaitSeconds) {
-    if ($isDotnetApp) {
-        # For dotnet apps, filter by command line containing the specific DLL
-        $processes = @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue | 
-            Where-Object { $_.CommandLine -like "*$dllName*" })
-    } else {
-        # For native executables, just get by process name
-        $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
-    }
+    $processes = Get-TargetProcesses
     if ($processes.Count -eq 0) {
         $logger.Log('Info', "Process exited after $waited seconds")
         break
@@ -268,12 +273,7 @@ while ($waited -lt $maxWaitSeconds) {
 }
 
 # Final check to confirm all process instances have terminated
-if ($isDotnetApp) {
-    $processes = @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue | 
-        Where-Object { $_.CommandLine -like "*$dllName*" })
-} else {
-    $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
-}
+$processes = Get-TargetProcesses
 
 if ($processes.Count -gt 0) {
     if ($isDotnetApp) {
@@ -289,9 +289,9 @@ if ($processes.Count -gt 0) {
     $processes | ForEach-Object {
         try {
             if ($isDotnetApp) {
-                $pid = $_.ProcessId
-                Stop-Process -Id $pid -Force -ErrorAction Stop
-                $logger.Log('Info', "Force-terminated dotnet process (PID $pid) running '$dllName'")
+                $processId = $_.ProcessId
+                Stop-Process -Id $processId -Force -ErrorAction Stop
+                $logger.Log('Info', "Force-terminated dotnet process (PID $processId) running '$dllName'")
             } else {
                 Stop-Process -Id $_.Id -Force -ErrorAction Stop
                 $logger.Log('Info', "Force-terminated process '$processName.exe' (PID $($_.Id))")
@@ -310,9 +310,8 @@ if ($processes.Count -gt 0) {
     Start-Sleep -Seconds 2
     
     # Verify all processes are now gone - fail deployment if any remain
+    $processes = Get-TargetProcesses
     if ($isDotnetApp) {
-        $processes = @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue | 
-            Where-Object { $_.CommandLine -like "*$dllName*" })
         if ($processes.Count -gt 0) {
             $pids = ($processes | ForEach-Object { $_.ProcessId }) -join ', '
             $logger.Log('Critical', "Unable to terminate dotnet process(es) running '$dllName' after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
