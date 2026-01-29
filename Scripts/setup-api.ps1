@@ -218,15 +218,21 @@ if (-not [string]::IsNullOrEmpty($script:startupScript)) {
         if ($processName -eq 'dotnet' -and $firstArg -like '*.dll') {
             $isDotnetApp = $true
             $dllName = [System.IO.Path]::GetFileName($firstArg)
-            $logger.Log('Info', "Detected dotnet application. Will filter processes by DLL: '$dllName'")
+            $logger.Log('Info', "Detected dotnet application from startup script. Will filter processes by DLL: '$dllName'")
         } else {
             $logger.Log('Info', "Extracted process name from startup script: '$processName'")
         }
     } else {
         $logger.Log('Warn', "Could not parse startup script to extract process name. Using service name: '$processName'")
     }
+} elseif (-not [string]::IsNullOrEmpty($script:defaultPort)) {
+    # Standard dotnet app deployed with DefaultPort (startup script will be created later)
+    $processName = 'dotnet'
+    $isDotnetApp = $true
+    $dllName = "$script:appName.dll"
+    $logger.Log('Info', "Detected dotnet application via DefaultPort parameter. Will filter processes by DLL: '$dllName'")
 } else {
-    $logger.Log('Info', "No startup script provided. Using service name as process name: '$processName'")
+    $logger.Log('Info', "No startup script or DefaultPort provided. Using service name as process name: '$processName'")
 }
 
 # Helper function to retrieve target processes based on app type
