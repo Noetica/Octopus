@@ -259,12 +259,23 @@ while ($waited -lt $maxWaitSeconds) {
     Start-Sleep -Seconds $waitInterval
     $waited += $waitInterval
 }
+
+# Final check to confirm all process instances have terminated
 if ($isDotnetApp) {
+    $processes = @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue | 
+        Where-Object { $_.CommandLine -like "*$dllName*" })
+} else {
+    $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+}
+
+if ($processes.Count -gt 0) {
+    if ($isDotnetApp) {
         $pids = ($processes | ForEach-Object { $_.ProcessId }) -join ', '
+        $logger.Log('Warn', "Dotnet process running '$dllName' still active after $maxWaitSeconds seconds: $($processes.Count) instance(s) with PID(s) $pids")
     } else {
         $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
+        $logger.Log('Warn', "Process '$processName.exe' still running after $maxWaitSeconds seconds: $($processes.Count) instance(s) with PID(s) $pids")
     }
-    $logger.Log('Warn', "Process '$processName.exe' still running after $maxWaitSeconds seconds: $($processes.Count) instance(s) with PID(s) $pids")
     
     # Attempt to force-terminate any remaining process instances
     $logger.Log('Warn', "Attempting to force-terminate remaining process(es)...")
@@ -273,49 +284,48 @@ if ($isDotnetApp) {
             if ($isDotnetApp) {
                 $pid = $_.ProcessId
                 Stop-Process -Id $pid -Force -ErrorAction Stop
-                $logger.Log('Info', "Force-terminated PID $pid")
+                $logger.Log('Info', "Force-terminated dotnet process (PID $pid) running '$dllName'")
             } else {
                 Stop-Process -Id $_.Id -Force -ErrorAction Stop
-                $logger.Log('Info', "Force-terminated PID $($_.Id)")
+                $logger.Log('Info', "Force-terminated process '$processName.exe' (PID $($_.Id))")
             }
-    $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
-    $logger.Log('Warn', "Process '$processName.exe' still running after $maxWaitSeconds seconds: $($processes.Count) instance(s) with PID(s) $pids")
+        }
+        catch {
+            if ($isDotnetApp) {
+                $logger.Log('Error', "Failed to force-terminate dotnet process (PID $($_.ProcessId)) running '$dllName': $($_.Exception.Message)")
+            } else {
+                $logger.Log('Error', "Failed to force-terminate process '$processName.exe' (PID $($_.Id)): $($_.Exception.Message)")
+            }
+        }
+    }
     
-    # Attempt to force-terminate any remaining process instances
-    $logger.Log('Warn', "Attempting to force-terminate remaining process(es)...")
-    $processes | ForEach-Object {
-        try {
-            Stop-Process -Id $_.Id -Force -ErrorAction Stop
-            $logger.Log('Info', "Force-terminated PID $($_.Id)")
+    # Give the OS a moment to clean up after forced termination
+    Start-Sleep -Seconds 2
+    
+    # Verify all processes are now gone - fail deployment if any remain
     if ($isDotnetApp) {
         $processes = @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue | 
             Where-Object { $_.CommandLine -like "*$dllName*" })
         if ($processes.Count -gt 0) {
             $pids = ($processes | ForEach-Object { $_.ProcessId }) -join ', '
-            $logger.Log('Critical', "Unable to terminate process(es) after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
+            $logger.Log('Critical', "Unable to terminate dotnet process(es) running '$dllName' after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
             exit 1
         }
     } else {
         $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
         if ($processes.Count -gt 0) {
             $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
-            $logger.Log('Critical', "Unable to terminate process(es) after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
+            $logger.Log('Critical', "Unable to terminate process '$processName.exe' after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
             exit 1
         }
-    
-    # Give the OS a moment to clean up after forced termination
-    Start-Sleep -Seconds 2
-    
-    # Verify all processes are now gone - fail deployment if any remain
-    $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
-    if ($processes.Count -gt 0) {
-        $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
-        $logger.Log('Critical', "Unable to terminate process(es) after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
-        exit 1
     }
     $logger.Log('Info', "All processes successfully terminated")
 } else {
-    $logger.Log('Info', "Process '$processName.exe' has fully terminated")
+    if ($isDotnetApp) {
+        $logger.Log('Info', "Dotnet process running '$dllName' has fully terminated")
+    } else {
+        $logger.Log('Info', "Process '$processName.exe' has fully terminated")
+    }
 }
 
 # Now safe to proceed with file operations
