@@ -232,7 +232,13 @@ $maxWaitSeconds = 10
 $waitInterval = 1
 $waited = 0
 
-$logger.Log('Info', "Waiting for process '$processName.exe' to fully exit...")
+if ($isDotnetApp -and $dllName) {
+    $logger.Log('Info', "Waiting for dotnet process hosting '$dllName' to fully exit...")
+} elseif ($isDotnetApp) {
+    $logger.Log('Info', "Waiting for dotnet process to fully exit...")
+} else {
+    $logger.Log('Info', "Waiting for process '$processName.exe' to fully exit...")
+}
 # Loop up to maxWaitSeconds, checking every waitInterval if the process has exited
 while ($waited -lt $maxWaitSeconds) {
     if ($isDotnetApp) {
