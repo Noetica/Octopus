@@ -248,8 +248,10 @@ function Get-TargetProcesses {
             $logger.Log('Error', "Cannot filter dotnet processes: DLL name is empty. This would match all dotnet.exe processes.")
             return @()
         }
+        # Use regex matching with delimiters to avoid matching DLL names embedded in longer names
+        $escapedDllName = [regex]::Escape($dllName)
         return @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue | 
-            Where-Object { $_.CommandLine -like "*$dllName*" })
+            Where-Object { $_.CommandLine -match "[\s`"]$escapedDllName[\s`"]" })
     } else {
         # For native executables, just get by process name
         return @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
