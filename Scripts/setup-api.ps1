@@ -303,6 +303,7 @@ if ($processes.Count -gt 0) {
     
     # Attempt to force-terminate any remaining process instances
     $logger.Log('Warn', "Attempting to force-terminate remaining process(es)...")
+    $terminationErrors = @()
     $processes | ForEach-Object {
         try {
             if ($isDotnetApp) {
@@ -316,11 +317,19 @@ if ($processes.Count -gt 0) {
         }
         catch {
             if ($isDotnetApp) {
-                $logger.Log('Error', "Failed to force-terminate dotnet process (PID $($_.ProcessId)) running '$dllName': $($_.Exception.Message)")
+                $errorMsg = "Failed to force-terminate dotnet process (PID $($_.ProcessId)) running '$dllName': $($_.Exception.Message)"
+                $terminationErrors += $errorMsg
+                $logger.Log('Error', $errorMsg)
             } else {
-                $logger.Log('Error', "Failed to force-terminate process '$processName.exe' (PID $($_.Id)): $($_.Exception.Message)")
+                $errorMsg = "Failed to force-terminate process '$processName.exe' (PID $($_.Id)): $($_.Exception.Message)"
+                $terminationErrors += $errorMsg
+                $logger.Log('Error', $errorMsg)
             }
         }
+    }
+    
+    if ($terminationErrors.Count -gt 0) {
+        $logger.Log('Error', "Force-termination summary: $($terminationErrors.Count) failure(s)")
     }
     
     # Give the OS a moment to clean up after forced termination
