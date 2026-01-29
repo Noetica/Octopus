@@ -278,7 +278,7 @@ if ($isDotnetApp -and -not [string]::IsNullOrEmpty($dllName)) {
 while ($waited -lt $maxWaitSeconds) {
     $processes = Get-TargetProcesses -IsDotnetApp $isDotnetApp -ProcessName $processName -DllName $dllName
     if ($processes.Count -eq 0) {
-        $logger.Log('Info', "Process exited after $waited seconds")
+        $logger.Log('Info', "Process exited within $waited seconds")
         break
     }
     if ($processes.Count -gt 1) {
