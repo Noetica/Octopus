@@ -349,7 +349,6 @@ if ($processes.Count -gt 0) {
             exit 1
         }
     } else {
-        $processes = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
         if ($processes.Count -gt 0) {
             $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
             $logger.Log('Critical', "Unable to terminate process '$processName.exe' after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
