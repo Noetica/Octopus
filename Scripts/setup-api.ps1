@@ -263,6 +263,19 @@ function Get-TargetProcesses {
     }
 }
 
+# Helper function to format process IDs as comma-separated string
+function Get-ProcessIdString {
+    param (
+        [bool]$IsDotnetApp,
+        [array]$Processes
+    )
+    if ($IsDotnetApp) {
+        return ($Processes | ForEach-Object { $_.ProcessId }) -join ', '
+    } else {
+        return ($Processes | ForEach-Object { $_.Id }) -join ', '
+    }
+}
+
 $maxWaitSeconds = 10
 $waitInterval = 1
 $waited = 0
@@ -283,11 +296,7 @@ while ($waited -lt $maxWaitSeconds) {
     }
     if ($processes.Count -gt 1) {
         # Log warning if multiple instances found - this is unexpected but we'll wait for all to exit
-        if ($isDotnetApp) {
-            $pids = ($processes | ForEach-Object { $_.ProcessId }) -join ', '
-        } else {
-            $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
-        }
+        $pids = Get-ProcessIdString -IsDotnetApp $isDotnetApp -Processes $processes
         $logger.Log('Warn', "Multiple instances detected ($($processes.Count)): PIDs $pids")
     }
     Start-Sleep -Seconds $waitInterval
@@ -298,11 +307,10 @@ while ($waited -lt $maxWaitSeconds) {
 $processes = Get-TargetProcesses -IsDotnetApp $isDotnetApp -ProcessName $processName -DllName $dllName
 
 if ($processes.Count -gt 0) {
+    $pids = Get-ProcessIdString -IsDotnetApp $isDotnetApp -Processes $processes
     if ($isDotnetApp) {
-        $pids = ($processes | ForEach-Object { $_.ProcessId }) -join ', '
         $logger.Log('Warn', "Dotnet process running '$dllName' still active after $maxWaitSeconds seconds: $($processes.Count) instance(s) with PID(s) $pids")
     } else {
-        $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
         $logger.Log('Warn', "Process '$processName.exe' still running after $maxWaitSeconds seconds: $($processes.Count) instance(s) with PID(s) $pids")
     }
     
@@ -342,18 +350,14 @@ if ($processes.Count -gt 0) {
     
     # Verify all processes are now gone - fail deployment if any remain
     $processes = Get-TargetProcesses -IsDotnetApp $isDotnetApp -ProcessName $processName -DllName $dllName
-    if ($isDotnetApp) {
-        if ($processes.Count -gt 0) {
-            $pids = ($processes | ForEach-Object { $_.ProcessId }) -join ', '
+    if ($processes.Count -gt 0) {
+        $pids = Get-ProcessIdString -IsDotnetApp $isDotnetApp -Processes $processes
+        if ($isDotnetApp) {
             $logger.Log('Critical', "Unable to terminate dotnet process(es) running '$dllName' after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
-            exit 1
-        }
-    } else {
-        if ($processes.Count -gt 0) {
-            $pids = ($processes | ForEach-Object { $_.Id }) -join ', '
+        } else {
             $logger.Log('Critical', "Unable to terminate process '$processName.exe' after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
-            exit 1
         }
+        exit 1
     }
     $logger.Log('Info', "All processes successfully terminated")
 } else {
