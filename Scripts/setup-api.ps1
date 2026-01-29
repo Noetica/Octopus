@@ -11,6 +11,13 @@ Write-Output "The script is running from: $PSScriptRoot"
 . "$PSScriptRoot\utils\control-service.ps1"
 . "$PSScriptRoot\utils\file-logger.ps1"
 
+# Initialize script-scoped variables from parameters
+$script:appName = $AppName
+$script:sourceDir = $SourceDir
+$script:targetDir = $TargetDir
+$script:defaultPort = $DefaultPort
+$script:startupScript = $StartupScript
+
 <#==================================================#>
 
 function DeployLatestArtifact() {
