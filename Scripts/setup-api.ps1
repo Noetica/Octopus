@@ -8,6 +8,14 @@ param (
 )
 
 Write-Output "The script is running from: $PSScriptRoot"
+
+# Initialize script-scoped variables from parameters
+$script:appName = $AppName
+$script:sourceDir = $SourceDir
+$script:targetDir = $TargetDir
+$script:defaultPort = $DefaultPort
+$script:startupScript = $StartupScript
+
 . "$PSScriptRoot\utils\control-service.ps1"
 . "$PSScriptRoot\utils\file-logger.ps1"
 
@@ -180,7 +188,187 @@ $startupScript
 }
 
 $logger = File-Logger  # Use File-Logger util
+
+# Stop the service using the control-service utility
+$logger.Log('Info', "Stopping service: $script:appName")
 Stop-Service -targets $script:appName
+
+# Wait for the actual process to fully terminate and release file locks
+# The service may report as "Stopped" but the process can still be shutting down
+# Note: We handle multiple instances in case of previous failures or manual starts
+
+# Extract the actual process name and arguments from the startup script
+# For native executables: "start \"WindowTitle\" ProcessName.exe" -> ProcessName
+# For dotnet apps: "start \"WindowTitle\" dotnet App.dll" -> need to filter by App.dll in command line
+$processName = $script:appName  # Default fallback
+$isDotnetApp = $false
+$dllName = $null
+
+if (-not [string]::IsNullOrEmpty($script:startupScript)) {
+    # Parse the startup script to extract the actual executable name
+    # Pattern: start "title" executable [args...]
+    if ($script:startupScript -match 'start\s+"[^"]+"\s+(\S+)(?:\s+(\S+))?') {
+        $executablePath = $matches[1]
+        $firstArg = $matches[2]
+        
+        # Validate that we actually captured an executable path
+        if (-not [string]::IsNullOrEmpty($executablePath)) {
+            # Extract just the process name without path or extension
+            $processName = [System.IO.Path]::GetFileNameWithoutExtension($executablePath)
+            
+            # Check if this is a dotnet application
+            if ($processName -eq 'dotnet' -and $firstArg -like '*.dll') {
+                $isDotnetApp = $true
+                $dllName = [System.IO.Path]::GetFileName($firstArg)
+                $logger.Log('Info', "Detected dotnet application from startup script. Will filter processes by DLL: '$dllName'")
+            } else {
+                $logger.Log('Info', "Extracted process name from startup script: '$processName'")
+            }
+        } else {
+            $logger.Log('Warn', "Startup script matched pattern but executable path is empty. Using service name: '$processName'")
+        }
+    } else {
+        $logger.Log('Warn', "Could not parse startup script to extract process name. Using service name: '$processName'")
+    }
+} elseif (-not [string]::IsNullOrEmpty($script:defaultPort)) {
+    # Standard dotnet app deployed with DefaultPort (startup script will be created later)
+    $processName = 'dotnet'
+    $isDotnetApp = $true
+    $dllName = "$script:appName.dll"
+    $logger.Log('Info', "Detected dotnet application via DefaultPort parameter. Will filter processes by DLL: '$dllName'")
+} else {
+    $logger.Log('Info', "No startup script or DefaultPort provided. Using service name as process name: '$processName'")
+}
+
+# Helper function to retrieve target processes based on app type
+function Get-TargetProcesses {
+    param (
+        [bool]$IsDotnetApp,
+        [string]$ProcessName,
+        [string]$DllName
+    )
+    if ($IsDotnetApp) {
+        # For dotnet apps, filter by command line containing the specific DLL
+        if ([string]::IsNullOrEmpty($DllName)) {
+            $logger.Log('Error', "Cannot filter dotnet processes: DLL name is empty. This would match all dotnet.exe processes.")
+            return @()
+        }
+        # Use regex matching with delimiters to avoid matching DLL names embedded in longer names
+        $escapedDllName = [regex]::Escape($DllName)
+        return @(Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" -ErrorAction SilentlyContinue | 
+            Where-Object { $_.CommandLine -match "[\s`"]$escapedDllName[\s`"]" })
+    } else {
+        # For native executables, just get by process name
+        return @(Get-Process -Name $ProcessName -ErrorAction SilentlyContinue)
+    }
+}
+
+# Helper function to format process IDs as comma-separated string
+function Get-ProcessIdString {
+    param (
+        [bool]$IsDotnetApp,
+        [array]$Processes
+    )
+    if ($IsDotnetApp) {
+        return ($Processes | ForEach-Object { $_.ProcessId }) -join ', '
+    } else {
+        return ($Processes | ForEach-Object { $_.Id }) -join ', '
+    }
+}
+
+$maxWaitSeconds = 10
+$waitInterval = 1
+$waited = 0
+
+if ($isDotnetApp -and -not [string]::IsNullOrEmpty($dllName)) {
+    $logger.Log('Info', "Waiting for dotnet process hosting '$dllName' to fully exit...")
+} elseif ($isDotnetApp) {
+    $logger.Log('Info', "Waiting for dotnet process to fully exit (DLL name unknown)...")
+} else {
+    $logger.Log('Info', "Waiting for process '$processName.exe' to fully exit...")
+}
+# Loop up to maxWaitSeconds, checking every waitInterval if the process has exited
+while ($waited -lt $maxWaitSeconds) {
+    $processes = Get-TargetProcesses -IsDotnetApp $isDotnetApp -ProcessName $processName -DllName $dllName
+    if ($processes.Count -eq 0) {
+        $logger.Log('Info', "Process exited within $waited seconds")
+        break
+    }
+    if ($processes.Count -gt 1) {
+        # Log warning if multiple instances found - this is unexpected but we'll wait for all to exit
+        $pids = Get-ProcessIdString -IsDotnetApp $isDotnetApp -Processes $processes
+        $logger.Log('Warn', "Multiple instances detected ($($processes.Count)): PIDs $pids")
+    }
+    Start-Sleep -Seconds $waitInterval
+    $waited += $waitInterval
+}
+
+# Final check to confirm all process instances have terminated
+$processes = Get-TargetProcesses -IsDotnetApp $isDotnetApp -ProcessName $processName -DllName $dllName
+
+if ($processes.Count -gt 0) {
+    $pids = Get-ProcessIdString -IsDotnetApp $isDotnetApp -Processes $processes
+    if ($isDotnetApp) {
+        $logger.Log('Warn', "Dotnet process running '$dllName' still active after $maxWaitSeconds seconds: $($processes.Count) instance(s) with PID(s) $pids")
+    } else {
+        $logger.Log('Warn', "Process '$processName.exe' still running after $maxWaitSeconds seconds: $($processes.Count) instance(s) with PID(s) $pids")
+    }
+    
+    # Attempt to force-terminate any remaining process instances
+    $logger.Log('Warn', "Attempting to force-terminate remaining process(es)...")
+    $terminationErrors = @()
+    $processes | ForEach-Object {
+        try {
+            if ($isDotnetApp) {
+                $processId = $_.ProcessId
+                Stop-Process -Id $processId -Force -ErrorAction Stop
+                $logger.Log('Info', "Force-terminated dotnet process (PID $processId) running '$dllName'")
+            } else {
+                Stop-Process -Id $_.Id -Force -ErrorAction Stop
+                $logger.Log('Info', "Force-terminated process '$processName.exe' (PID $($_.Id))")
+            }
+        }
+        catch {
+            if ($isDotnetApp) {
+                $errorMsg = "Failed to force-terminate dotnet process (PID $($_.ProcessId)) running '$dllName': $($_.Exception.Message)"
+                $terminationErrors += $errorMsg
+                $logger.Log('Error', $errorMsg)
+            } else {
+                $errorMsg = "Failed to force-terminate process '$processName.exe' (PID $($_.Id)): $($_.Exception.Message)"
+                $terminationErrors += $errorMsg
+                $logger.Log('Error', $errorMsg)
+            }
+        }
+    }
+    
+    if ($terminationErrors.Count -gt 0) {
+        $logger.Log('Error', "Force-termination summary: $($terminationErrors.Count) failure(s)")
+    }
+    
+    # Give the OS a moment to clean up after forced termination
+    Start-Sleep -Seconds 2
+    
+    # Verify all processes are now gone - fail deployment if any remain
+    $processes = Get-TargetProcesses -IsDotnetApp $isDotnetApp -ProcessName $processName -DllName $dllName
+    if ($processes.Count -gt 0) {
+        $pids = Get-ProcessIdString -IsDotnetApp $isDotnetApp -Processes $processes
+        if ($isDotnetApp) {
+            $logger.Log('Critical', "Unable to terminate dotnet process(es) running '$dllName' after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
+        } else {
+            $logger.Log('Critical', "Unable to terminate process '$processName.exe' after force-kill attempt. PID(s): $pids. Deployment cannot proceed safely.")
+        }
+        exit 1
+    }
+    $logger.Log('Info', "All processes successfully terminated")
+} else {
+    if ($isDotnetApp) {
+        $logger.Log('Info', "Dotnet process running '$dllName' has fully terminated")
+    } else {
+        $logger.Log('Info', "Process '$processName.exe' has fully terminated")
+    }
+}
+
+# Now safe to proceed with file operations
 DeployLatestArtifact -exclusions $FileExclusions
 $logger.Log('Debug', "Startup script selection")
 $logger.Log('Debug', "DefaultPort: [($DefaultPort)]")
