@@ -10,6 +10,17 @@ $Octopus = @{
 }
 
 $Environments = @{
+    'Developer VMs' = @{
+        Id      = $null
+        Tenants = @(
+            @{ Id = $null; Name = 'DEV-GEORGEP' }
+            @{ Id = $null; Name = 'DEV-IANH' }
+            @{ Id = $null; Name = 'DEV-JOHNG' }
+            @{ Id = $null; Name = 'DEV-LUKEH' }
+            @{ Id = $null; Name = 'DEV-MARKW' }
+            @{ Id = $null; Name = 'DEV-PAULK' }
+        )
+    }
     Development = @{
         Id      = $null
         Tenants = @(
