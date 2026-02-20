@@ -79,7 +79,7 @@ function GetEnvironments {
     foreach ($Object in $Response) {
         if ($Object.PSObject.Properties.Name -contains 'Name') {
             foreach ($Environment in $Environments.GetEnumerator()) {
-                if ($Object.Name -ieq $Environment.Key) {
+                if (($Object.Name -replace '\s+', ' ').Trim() -ieq ($Environment.Key -replace '\s+', ' ').Trim()) {
                     if ($null -ne $Environment.Value.Tenants) {
                         Write-Host $(" [✓] Tenant '{0}' assigned to default environment: '{1}' ({2})" -f (($Environment.Value.Tenants | ForEach-Object { $_.Name }) -join ', '), $Environment.Key, $Object.Id)
                     }
