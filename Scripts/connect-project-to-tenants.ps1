@@ -74,16 +74,21 @@ function GetEnvironments {
     }
     Write-Host "Environments found.`n"
 
-    # Map default tenants to environments
+    # Map default tenants to environments.
+    # Iterate Keys (not GetEnumerator) and use $script: to guarantee we are modifying the
+    # script-scope hashtable, not a function-local copy. Whitespace in the API-returned name
+    # (e.g. non-breaking spaces in 'Developer VMs') is normalised before comparison.
     Write-Host 'Mapping defaults...'
     foreach ($Object in $Response) {
         if ($Object.PSObject.Properties.Name -contains 'Name') {
-            foreach ($Environment in $Environments.GetEnumerator()) {
-                if (($Object.Name -replace '\s+', ' ').Trim() -ieq ($Environment.Key -replace '\s+', ' ').Trim()) {
-                    if ($null -ne $Environment.Value.Tenants) {
-                        Write-Host $(" [✓] Tenant '{0}' assigned to default environment: '{1}' ({2})" -f (($Environment.Value.Tenants | ForEach-Object { $_.Name }) -join ', '), $Environment.Key, $Object.Id)
+            $normObjectName = ($Object.Name -replace '[\s\u00A0]+', ' ').Trim()
+            foreach ($EnvName in @($script:Environments.Keys)) {
+                $normEnvKey = ($EnvName -replace '[\s\u00A0]+', ' ').Trim()
+                if ($normObjectName -ieq $normEnvKey) {
+                    if ($null -ne $script:Environments[$EnvName].Tenants) {
+                        Write-Host $(" [✓] Tenant '{0}' assigned to default environment: '{1}' ({2})" -f (($script:Environments[$EnvName].Tenants | ForEach-Object { $_.Name }) -join ', '), $EnvName, $Object.Id)
                     }
-                    $Environments[$Environment.Key].Id = $Object.Id
+                    $script:Environments[$EnvName].Id = $Object.Id
                 }
             }
         }
@@ -110,43 +115,47 @@ function GetTenants {
 
     Write-Host 'Mapping tenant environments...'
     if (-not($null -eq $Response)) {
-        $Environments['Production'].Tenants = @()
+        $script:Environments['Production'].Tenants = @()
 
         foreach ($Object in $Response) {
-            $Exists = $Environments.Values | Where-Object { 
-                $_.Tenants | Where-Object { $_.Name -eq $Object.Name }
+            # Check if this tenant is pre-assigned to a specific environment (not Production)
+            $assignedEnvName = $null
+            $assignedTenant  = $null
+            foreach ($EnvName in $script:Environments.Keys) {
+                if ($EnvName -eq 'Production') { continue }
+                $match = $script:Environments[$EnvName].Tenants | Where-Object { $_.Name -eq $Object.Name }
+                if ($match) {
+                    $assignedEnvName = $EnvName
+                    $assignedTenant  = $match
+                    break
+                }
             }
-            
-            if (-not ($Exists.Tenants | Where-Object { $_.Name -eq $Object.Name })) {
-                Write-Output " [✓] Tenant '$($Object.Name)' ($($Object.Id)) assigned to environment: 'Production' ($($Environments['Production'].Id))"
-                $Environments['Production'].Tenants += [PSCustomObject]@{
+
+            if ($null -eq $assignedEnvName) {
+                # Not pre-assigned — link to Production
+                Write-Output " [✓] Tenant '$($Object.Name)' ($($Object.Id)) assigned to environment: 'Production' ($($script:Environments['Production'].Id))"
+                $script:Environments['Production'].Tenants += [PSCustomObject]@{
                     Id   = $Object.Id
                     Name = $Object.Name
                 }
             }
             else {
-                # Find the existing tenant and update its Id
-                foreach ($Env in $Environments.Values) {
-                    $TenantToUpdate = $Env.Tenants | Where-Object { $_.Name -eq $Object.Name }
-                    if ($TenantToUpdate) {
-                        $TenantToUpdate.Id = $Object.Id
-                        Write-Output " Updated Tenant Id for '$($Object.Name)' ($($Object.Id))"
-                        break
-                    }
-                }
+                # Pre-assigned — just update its Id so LinkTenants can use it
+                $assignedTenant.Id = $Object.Id
+                Write-Output " Updated Tenant Id for '$($Object.Name)' ($($Object.Id)) in environment '$assignedEnvName'"
             }
         }
     }
 
-    Write-Host "Tenant environments mapped.`n`nSummary: $($Environments | ConvertTo-Json -Depth 3)`n"
+    Write-Host "Tenant environments mapped.`n`nSummary: $($script:Environments | ConvertTo-Json -Depth 3)`n"
 }
 
 # Function: Update tenants with project-environment mapping
 function LinkTenants {
     Write-Host 'Updating tenants...'
     # Iterate through each environment
-    foreach ($EnvironmentName in $Environments.Keys) {
-        $Environment = $Environments[$EnvironmentName]
+    foreach ($EnvironmentName in $script:Environments.Keys) {
+        $Environment = $script:Environments[$EnvironmentName]
 
         Write-Host "Processing environment: $EnvironmentName"
         foreach ($Tenant in $Environment.Tenants) {
@@ -166,7 +175,7 @@ function LinkTenants {
                 foreach ($Property in $Object.ProjectEnvironments.PSObject.Properties) {
                     $ProjectEnvironments[$Property.Name] = $Property.Value
                 }
-                $ProjectEnvironments[$Project.Id] = @($Environment.Id)
+                $ProjectEnvironments[$script:Project.Id] = @($Environment.Id)
                 $Object.ProjectEnvironments = $ProjectEnvironments
 
                 # Set up request & payload
