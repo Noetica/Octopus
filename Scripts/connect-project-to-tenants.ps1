@@ -13,12 +13,12 @@ $Environments = @{
     'Developer VMs' = @{
         Id      = $null
         Tenants = @(
-            @{ Id = $null; Name = 'DEV-GEORGEP' }
-            @{ Id = $null; Name = 'DEV-IANH' }
-            @{ Id = $null; Name = 'DEV-JOHNG' }
-            @{ Id = $null; Name = 'DEV-LUKEH' }
-            @{ Id = $null; Name = 'DEV-MARKW' }
-            @{ Id = $null; Name = 'DEV-PAULK' }
+            @{ Id = $null; Name = 'Dev-GeorgeP' }
+            @{ Id = $null; Name = 'Dev-IanH' }
+            @{ Id = $null; Name = 'Dev-JohnG' }
+            @{ Id = $null; Name = 'Dev-LukeH' }
+            @{ Id = $null; Name = 'Dev-MarkW' }
+            @{ Id = $null; Name = 'Dev-PaulK' }
         )
     }
     Development = @{
