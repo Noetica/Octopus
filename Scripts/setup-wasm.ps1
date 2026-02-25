@@ -1,226 +1,198 @@
 param (
 	[Parameter(Mandatory = $true)] [string]$AppName,
 	[Parameter(Mandatory = $true)] [string]$SourceDir,
-	[Parameter(Mandatory = $false)] [string]$TargetDir,
-	[Parameter(Mandatory = $false)] [string]$WebAppName,
+	[Parameter(Mandatory = $true)] [string]$TargetDir,
 	[Parameter(Mandatory = $false)] [string]$SiteRoot = 'Synthesys_General',
-	[Parameter(Mandatory = $false)] [string[]]$BackupFiles,
-	[Parameter(Mandatory = $false)] [string[]]$FileExclusions
+	[Parameter(Mandatory = $false)] [string[]]$BackupFiles
 )
 
-Write-Output "The script is running from: $PSScriptRoot"
+<#
+	Lightweight deployment script for Blazor WebAssembly (static file) applications.
 
+	Unlike setup-webapp.ps1 (which manages app pools with .NET CLR v4.0), this script
+	creates app pools with "No Managed Code" since WASM apps are purely static files
+	served by IIS. File deployment uses robocopy /MIR for efficiency.
+
+	Parameters:
+		AppName     - IIS application name and app pool suffix, e.g. AmdQaToolWasm
+		SourceDir   - Octopus-extracted package directory
+		TargetDir   - IIS physical path for the web application
+		SiteRoot    - IIS site name (default: Synthesys_General)
+		BackupFiles - Files to preserve across deployments, e.g. appsettings.Production.json
+#>
+
+Write-Output "The script is running from: $PSScriptRoot"
 . "$PSScriptRoot\utils\file-logger.ps1"
 
-# Initialize script-scoped variables from parameters
-$script:appName = $AppName
-$script:sourceDir = $SourceDir
-$script:backupDir = "$env:TentacleHome\Logs\$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
-$script:backupTargets = New-Object System.Collections.Generic.List[Hashtable]
-
-# Resolve target directory from IIS web application if setup-webapp.ps1 has been run.
-# WebAppName allows looking up a different IIS app name than AppName (e.g. AppName=AmdQaToolApi but WebAppName=AmdQaToolWasm)
-$script:targetDir = $null
-$iisAppName = if ([string]::IsNullOrEmpty($WebAppName)) { $AppName } else { $WebAppName }
-try {
-	Import-Module WebAdministration -ErrorAction Stop
-	$webApp = Get-WebApplication -Site $SiteRoot -Name $iisAppName -ErrorAction SilentlyContinue
-	if ($null -ne $webApp) {
-		$script:targetDir = $webApp.PhysicalPath
-		Write-Output "Resolved target directory from IIS application '/$iisAppName' on site '$SiteRoot': $($script:targetDir)"
-	}
-	else {
-		Write-Output "No IIS web application '/$iisAppName' found on site '$SiteRoot'."
-	}
-}
-catch {
-	Write-Output "WebAdministration module not available, falling back to TargetDir parameter."
-}
-
-# Fall back to the TargetDir parameter if IIS lookup didn't resolve
-if ([string]::IsNullOrEmpty($script:targetDir)) {
-	if ([string]::IsNullOrEmpty($TargetDir)) {
-		Write-Host "ERROR: Unable to resolve target directory. No IIS web application '/$iisAppName' found on site '$SiteRoot' and no -TargetDir parameter provided." -ForegroundColor Red
-		exit 1
-	}
-	$script:targetDir = $TargetDir
-	Write-Output "Using TargetDir parameter: $($script:targetDir)"
-}
+$script:appPoolName = "$($SiteRoot)_$($AppName)"
+$script:backupDir = "$env:TentacleHome\Backups\$($AppName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
 
 <#==================================================#>
 
-function ConfigureBackupRestore() {
+function EnsureIISPrerequisites() {
+	if (-not (Get-Module -Name WebAdministration)) {
+		Import-Module WebAdministration -ErrorAction Stop
+		$logger.Log('Debug', 'Imported WebAdministration module.')
+	}
+}
+
+<#
+	Ensure the IIS app pool exists with "No Managed Code" (empty managedRuntimeVersion).
+	Blazor WASM apps are static files and do not need the .NET CLR loaded.
+	Creates the pool if missing; corrects managedRuntimeVersion if wrong (e.g. v4.0).
+#>
+function EnsureAppPool() {
+	$poolPath = "IIS:\AppPools\$script:appPoolName"
+
+	if (-not (Test-Path $poolPath)) {
+		$logger.Log('Warn', "App pool missing. Creating '$script:appPoolName' with No Managed Code...")
+		New-WebAppPool -Name $script:appPoolName | Out-Null
+		Set-ItemProperty $poolPath -Name managedRuntimeVersion -Value ''
+		Set-ItemProperty $poolPath -Name autoStart -Value $true
+		$logger.Log('Info', "App pool created. ($script:appPoolName)")
+	}
+	else {
+		$currentRuntime = (Get-ItemProperty $poolPath).managedRuntimeVersion
+		if ($currentRuntime -ne '') {
+			$logger.Log('Warn', "App pool has managedRuntimeVersion='$currentRuntime'. Changing to No Managed Code...")
+			Set-ItemProperty $poolPath -Name managedRuntimeVersion -Value ''
+			$logger.Log('Info', 'App pool corrected to No Managed Code.')
+		}
+		else {
+			$logger.Log('Info', "App pool exists with No Managed Code. ($script:appPoolName)")
+		}
+	}
+}
+
+<#
+	Ensure the IIS web application exists under the target site.
+	Creates it if missing.
+#>
+function EnsureWebApplication() {
+	$existingApp = Get-WebApplication -Site $SiteRoot -Name $AppName -ErrorAction SilentlyContinue
+
+	if ($null -eq $existingApp) {
+		$logger.Log('Warn', "Web application missing. Creating '/$AppName' on site '$SiteRoot'...")
+		if (-not (Test-Path $TargetDir)) {
+			New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+		}
+		New-WebApplication -Site $SiteRoot -Name $AppName -PhysicalPath $TargetDir -ApplicationPool $script:appPoolName | Out-Null
+		$logger.Log('Info', "Web application created. (/$AppName -> $TargetDir)")
+	}
+	else {
+		$logger.Log('Info', "Web application exists. (/$AppName)")
+	}
+}
+
+<#
+	Backup specified files from the current deployment before overwriting.
+#>
+function BackupFiles() {
 	if ($null -eq $BackupFiles -or $BackupFiles.Count -eq 0) {
 		$logger.Log('Debug', 'No backup files configured.')
 		return
 	}
-
-	foreach ($filename in $BackupFiles) {
-		$logger.Log('Debug', "Adding backup/restore target. ($filename)")
-		$script:backupTargets.Add(
-			[Hashtable]@{
-				filename      = $filename
-				relativePaths = @()
-			}
-		) | Out-Null
-	}
-}
-
-function CheckExistingDeployment() {
-	$logger.Log('Info', 'Checking existing WASM deployment...')
-	if (-not (Test-Path $script:targetDir)) {
-		$logger.Log('Info', 'No existing deployment found.')
+	if (-not (Test-Path $TargetDir)) {
+		$logger.Log('Debug', 'Target directory does not exist yet. Nothing to backup.')
 		return
 	}
 
-	foreach ($target in $script:backupTargets) {
-		$matches = @(Get-ChildItem -Path $script:targetDir -Recurse -File -Filter $target.filename -ErrorAction SilentlyContinue)
-		if ($matches.Count -eq 0) {
-			continue
-		}
-
+	foreach ($filename in $BackupFiles) {
+		$matches = @(Get-ChildItem -Path $TargetDir -Recurse -File -Filter $filename -ErrorAction SilentlyContinue)
 		foreach ($file in $matches) {
-			$relativePath = $file.FullName.Substring($script:targetDir.Length).TrimStart('\\')
-			$target.relativePaths += $relativePath
-
-			$destinationDir = Join-Path -Path $script:backupDir -ChildPath (Split-Path -Path $relativePath -Parent)
-			if (-not (Test-Path $destinationDir)) {
-				New-Item -Path $destinationDir -ItemType Directory -Force | Out-Null
+			$relativePath = $file.FullName.Substring($TargetDir.Length).TrimStart('\')
+			$backupPath = Join-Path $script:backupDir $relativePath
+			$backupParent = Split-Path $backupPath -Parent
+			if (-not (Test-Path $backupParent)) {
+				New-Item -Path $backupParent -ItemType Directory -Force | Out-Null
 			}
-
-			$destinationFile = Join-Path -Path $script:backupDir -ChildPath $relativePath
-			Copy-Item -Path $file.FullName -Destination $destinationFile -Force
-
-			if (Test-Path $destinationFile) {
-				$logger.Log('Info', "Backed up successfully. ($destinationFile)")
+			Copy-Item -Path $file.FullName -Destination $backupPath -Force
+			if (Test-Path $backupPath) {
+				$logger.Log('Info', "Backed up: $relativePath")
 			}
 			else {
-				$logger.Log('Critical', "Failed to backup file. ($($file.FullName))")
+				$logger.Log('Critical', "Failed to backup: $relativePath")
 				exit 1
 			}
 		}
 	}
 }
 
-function DeployLatestArtifact() {
-	if (-not (Test-Path -Path $script:sourceDir)) {
-		$logger.Log('Critical', "Source directory does not exist. ($($script:sourceDir))")
+<#
+	Deploy files from source to target using robocopy /MIR for fast, efficient mirroring.
+	This replaces the file-by-file copy approach — one robocopy call handles the lot.
+	Robocopy exit codes 0-7 are success; 8+ are errors.
+#>
+function DeployFiles() {
+	if (-not (Test-Path -Path $SourceDir)) {
+		$logger.Log('Critical', "Source directory does not exist. ($SourceDir)")
 		exit 1
 	}
 
-	if (-not (Test-Path -Path $script:targetDir)) {
-		$logger.Log('Debug', 'Creating target directory...')
-		New-Item -ItemType Directory -Path $script:targetDir -Force | Out-Null
-		if (Test-Path $script:targetDir) {
-			$logger.Log('Debug', "Directory created successfully. ($($script:targetDir))")
-		}
-		else {
-			$logger.Log('Critical', "Directory not created. ($($script:targetDir))")
-			exit 1
+	if (-not (Test-Path -Path $TargetDir)) {
+		New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+		$logger.Log('Debug', "Created target directory. ($TargetDir)")
+	}
+
+	$logger.Log('Info', "Deploying WASM files: $SourceDir -> $TargetDir")
+
+	$robocopyArgs = @($SourceDir, $TargetDir, '/MIR', '/R:3', '/W:5', '/NP', '/NFL', '/NDL')
+	$logger.Log('Debug', "robocopy $($robocopyArgs -join ' ')")
+
+	$output = & robocopy @robocopyArgs 2>&1
+	$exitCode = $LASTEXITCODE
+
+	# Log the summary lines from robocopy output
+	$inSummary = $false
+	foreach ($line in $output) {
+		$trimmed = "$line".Trim()
+		if ($trimmed -match '^-+$') { $inSummary = $true; continue }
+		if ($inSummary -and $trimmed -ne '') {
+			$logger.Log('Info', $trimmed)
 		}
 	}
-	else {
-		$logger.Log('Debug', 'Clearing deployment target directory contents...')
 
-		$excludedNames = @()
-		if ($null -ne $FileExclusions) {
-			$excludedNames += $FileExclusions
-		}
-		$excludedNames += ($script:backupTargets | ForEach-Object { $_.filename })
-		$excludedNames = @($excludedNames | Select-Object -Unique)
-
-		$errorList = @()
-		$targets = @(Get-ChildItem -Path $script:targetDir -Force)
-		foreach ($item in $targets) {
-			if ($excludedNames -contains $item.Name) {
-				$logger.Log('Debug', "Skipping excluded item. ($($item.FullName))")
-				continue
-			}
-
-			try {
-				Remove-Item -LiteralPath $item.FullName -Force -Recurse -ErrorAction Stop
-				$logger.Log('Debug', "Deleted successfully. ($($item.FullName))")
-			}
-			catch {
-				$errorList += "Failed to delete: $($item.FullName) | Error: $($_.Exception.Message)"
-				# Use 'Continue' to prevent Write-Error inside the logger from throwing
-				# when Octopus sets $ErrorActionPreference = 'Stop'
-				$previousEAP = $ErrorActionPreference
-				$ErrorActionPreference = 'Continue'
-				$logger.Log('Error', "Failed to delete. ($($item.FullName))")
-				$ErrorActionPreference = $previousEAP
-			}
-		}
-
-		if ($errorList.Count -gt 0) {
+	if ($exitCode -ge 8) {
+		$logger.Log('Critical', "robocopy failed with exit code $exitCode")
+		foreach ($line in $output) {
 			$previousEAP = $ErrorActionPreference
 			$ErrorActionPreference = 'Continue'
-			$logger.Log('Error', 'Error(s) occurred during target clean-up:')
-			$errorList | ForEach-Object { $logger.Log('Error', $_) }
+			$logger.Log('Error', "$line")
 			$ErrorActionPreference = $previousEAP
-			exit 1
 		}
+		exit 1
 	}
 
-	$logger.Log('Info', 'Deploying latest WASM artifact...')
-	$itemsToCopy = Get-ChildItem -Path $script:sourceDir -Recurse -Force
-	foreach ($item in $itemsToCopy) {
-		$relativePath = $item.FullName.Substring($script:sourceDir.Length).TrimStart('\\')
-		$destinationPath = Join-Path -Path $script:targetDir -ChildPath $relativePath
-
-		if ($item.PSIsContainer) {
-			New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
-			continue
-		}
-
-		$destinationParent = Split-Path -Path $destinationPath -Parent
-		if (-not (Test-Path $destinationParent)) {
-			New-Item -ItemType Directory -Path $destinationParent -Force | Out-Null
-		}
-
-		try {
-			Copy-Item -Path $item.FullName -Destination $destinationPath -Force -ErrorAction Stop
-			if (Test-Path $destinationPath) {
-				$logger.Log('Info', "Copied successfully. ($relativePath)")
-			}
-			else {
-				$logger.Log('Critical', "File not copied. ($($item.FullName))")
-				exit 1
-			}
-		}
-		catch {
-			$logger.Log('Critical', "Failed to copy file. ($($item.FullName)) - $($_.Exception.Message)")
-			exit 1
-		}
-	}
+	$logger.Log('Info', "Deployment complete. (robocopy exit code: $exitCode)")
 }
 
-function RestoreBackups() {
-	$targetsWithBackups = @($script:backupTargets | Where-Object { $_.relativePaths.Count -gt 0 })
-	if ($targetsWithBackups.Count -eq 0) {
+<#
+	Restore backed-up files over the freshly deployed versions.
+#>
+function RestoreFiles() {
+	if (-not (Test-Path $script:backupDir)) { return }
+
+	$backedUp = @(Get-ChildItem -Path $script:backupDir -Recurse -File -ErrorAction SilentlyContinue)
+	if ($backedUp.Count -eq 0) {
 		$logger.Log('Debug', 'No backups to restore.')
 		return
 	}
 
-	$logger.Log('Info', 'Restoring backups...')
-	foreach ($target in $targetsWithBackups) {
-		foreach ($relativePath in $target.relativePaths) {
-			$source = Join-Path -Path $script:backupDir -ChildPath $relativePath
-			$destination = Join-Path -Path $script:targetDir -ChildPath $relativePath
-			$destinationDir = Split-Path -Path $destination -Parent
-
-			if (-not (Test-Path $destinationDir)) {
-				New-Item -Path $destinationDir -ItemType Directory -Force | Out-Null
-			}
-
-			Copy-Item -Path $source -Destination $destination -Force
-			if (Test-Path $destination) {
-				$logger.Log('Info', "Restored successfully. ($relativePath)")
-			}
-			else {
-				$logger.Log('Critical', "Failed to restore backup. ($relativePath)")
-				exit 1
-			}
+	$logger.Log('Info', 'Restoring backed-up files...')
+	foreach ($file in $backedUp) {
+		$relativePath = $file.FullName.Substring($script:backupDir.Length).TrimStart('\')
+		$destination = Join-Path $TargetDir $relativePath
+		$destParent = Split-Path $destination -Parent
+		if (-not (Test-Path $destParent)) {
+			New-Item -Path $destParent -ItemType Directory -Force | Out-Null
+		}
+		Copy-Item -Path $file.FullName -Destination $destination -Force
+		if (Test-Path $destination) {
+			$logger.Log('Info', "Restored: $relativePath")
+		}
+		else {
+			$logger.Log('Critical', "Failed to restore: $relativePath")
+			exit 1
 		}
 	}
 }
@@ -228,10 +200,13 @@ function RestoreBackups() {
 <#==================================================#>
 
 $logger = File-Logger
-ConfigureBackupRestore
-CheckExistingDeployment
-DeployLatestArtifact
-RestoreBackups
+EnsureIISPrerequisites
+EnsureAppPool
+EnsureWebApplication
+BackupFiles
+DeployFiles
+RestoreFiles
+
 $logFileLocation = File-Logger-Location
 Write-Host "WASM deployment completed. Full log file can be found at $logFileLocation."
 
