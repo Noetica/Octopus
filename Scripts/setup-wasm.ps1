@@ -163,6 +163,10 @@ function DeployFiles() {
 		exit 1
 	}
 
+	# Robocopy exit codes 0-7 are success. Reset $LASTEXITCODE so PowerShell
+	# does not propagate it to the calling process (Octopus treats non-zero as failure).
+	$global:LASTEXITCODE = 0
+
 	$logger.Log('Info', "Deployment complete. (robocopy exit code: $exitCode)")
 }
 
