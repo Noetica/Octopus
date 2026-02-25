@@ -1,21 +1,45 @@
 param (
 	[Parameter(Mandatory = $true)] [string]$AppName,
 	[Parameter(Mandatory = $true)] [string]$SourceDir,
-	[Parameter(Mandatory = $true)] [string]$TargetDir,
+	[Parameter(Mandatory = $false)] [string]$TargetDir,
+	[Parameter(Mandatory = $false)] [string]$SiteRoot = 'Synthesys_General',
 	[Parameter(Mandatory = $false)] [string[]]$BackupFiles,
 	[Parameter(Mandatory = $false)] [string[]]$FileExclusions
 )
 
 Write-Output "The script is running from: $PSScriptRoot"
 
+. "$PSScriptRoot\utils\file-logger.ps1"
+
 # Initialize script-scoped variables from parameters
 $script:appName = $AppName
 $script:sourceDir = $SourceDir
-$script:targetDir = $TargetDir
 $script:backupDir = "$env:TentacleHome\Logs\$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
 $script:backupTargets = New-Object System.Collections.Generic.List[Hashtable]
 
-. "$PSScriptRoot\utils\file-logger.ps1"
+# Resolve target directory from IIS web application if setup-webapp.ps1 has been run
+$script:targetDir = $null
+try {
+	Import-Module WebAdministration -ErrorAction Stop
+	$webApp = Get-WebApplication -Site $SiteRoot -Name $AppName -ErrorAction SilentlyContinue
+	if ($null -ne $webApp) {
+		$script:targetDir = $webApp.PhysicalPath
+		Write-Output "Resolved target directory from IIS application '/$AppName' on site '$SiteRoot': $($script:targetDir)"
+	}
+}
+catch {
+	Write-Output "WebAdministration module not available, falling back to TargetDir parameter."
+}
+
+# Fall back to the TargetDir parameter if IIS lookup didn't resolve
+if ([string]::IsNullOrEmpty($script:targetDir)) {
+	if ([string]::IsNullOrEmpty($TargetDir)) {
+		Write-Error "Unable to resolve target directory. No IIS web application '/$AppName' found on site '$SiteRoot' and no -TargetDir parameter provided."
+		exit 1
+	}
+	$script:targetDir = $TargetDir
+	Write-Output "Using TargetDir parameter: $($script:targetDir)"
+}
 
 <#==================================================#>
 
