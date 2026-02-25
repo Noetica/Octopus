@@ -113,13 +113,21 @@ function DeployLatestArtifact() {
 			}
 			catch {
 				$errorList += "Failed to delete: $($item.FullName) | Error: $($_.Exception.Message)"
+				# Use 'Continue' to prevent Write-Error inside the logger from throwing
+				# when Octopus sets $ErrorActionPreference = 'Stop'
+				$previousEAP = $ErrorActionPreference
+				$ErrorActionPreference = 'Continue'
 				$logger.Log('Error', "Failed to delete. ($($item.FullName))")
+				$ErrorActionPreference = $previousEAP
 			}
 		}
 
 		if ($errorList.Count -gt 0) {
+			$previousEAP = $ErrorActionPreference
+			$ErrorActionPreference = 'Continue'
 			$logger.Log('Error', 'Error(s) occurred during target clean-up:')
 			$errorList | ForEach-Object { $logger.Log('Error', $_) }
+			$ErrorActionPreference = $previousEAP
 			exit 1
 		}
 	}
