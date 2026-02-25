@@ -2,6 +2,7 @@ param (
 	[Parameter(Mandatory = $true)] [string]$AppName,
 	[Parameter(Mandatory = $true)] [string]$SourceDir,
 	[Parameter(Mandatory = $false)] [string]$TargetDir,
+	[Parameter(Mandatory = $false)] [string]$WebAppName,
 	[Parameter(Mandatory = $false)] [string]$SiteRoot = 'Synthesys_General',
 	[Parameter(Mandatory = $false)] [string[]]$BackupFiles,
 	[Parameter(Mandatory = $false)] [string[]]$FileExclusions
@@ -17,14 +18,19 @@ $script:sourceDir = $SourceDir
 $script:backupDir = "$env:TentacleHome\Logs\$($script:appName)_$((Get-Date).ToString('yyyyMMdd_HHmmss'))"
 $script:backupTargets = New-Object System.Collections.Generic.List[Hashtable]
 
-# Resolve target directory from IIS web application if setup-webapp.ps1 has been run
+# Resolve target directory from IIS web application if setup-webapp.ps1 has been run.
+# WebAppName allows looking up a different IIS app name than AppName (e.g. AppName=AmdQaToolApi but WebAppName=AmdQaToolWasm)
 $script:targetDir = $null
+$iisAppName = if ([string]::IsNullOrEmpty($WebAppName)) { $AppName } else { $WebAppName }
 try {
 	Import-Module WebAdministration -ErrorAction Stop
-	$webApp = Get-WebApplication -Site $SiteRoot -Name $AppName -ErrorAction SilentlyContinue
+	$webApp = Get-WebApplication -Site $SiteRoot -Name $iisAppName -ErrorAction SilentlyContinue
 	if ($null -ne $webApp) {
 		$script:targetDir = $webApp.PhysicalPath
-		Write-Output "Resolved target directory from IIS application '/$AppName' on site '$SiteRoot': $($script:targetDir)"
+		Write-Output "Resolved target directory from IIS application '/$iisAppName' on site '$SiteRoot': $($script:targetDir)"
+	}
+	else {
+		Write-Output "No IIS web application '/$iisAppName' found on site '$SiteRoot'."
 	}
 }
 catch {
@@ -34,7 +40,7 @@ catch {
 # Fall back to the TargetDir parameter if IIS lookup didn't resolve
 if ([string]::IsNullOrEmpty($script:targetDir)) {
 	if ([string]::IsNullOrEmpty($TargetDir)) {
-		Write-Error "Unable to resolve target directory. No IIS web application '/$AppName' found on site '$SiteRoot' and no -TargetDir parameter provided."
+		Write-Host "ERROR: Unable to resolve target directory. No IIS web application '/$iisAppName' found on site '$SiteRoot' and no -TargetDir parameter provided." -ForegroundColor Red
 		exit 1
 	}
 	$script:targetDir = $TargetDir
