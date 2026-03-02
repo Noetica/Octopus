@@ -183,12 +183,12 @@ function RestoreBackups() {
 				New-Item -Path $destinationDir -ItemType Directory -Force | Out-Null
 			}
 
-			Copy-Item -Path $source -Destination $destination -Force
-			if (Test-Path $destination) {
+			try {
+				Copy-Item -Path $source -Destination $destination -Force -ErrorAction Stop
 				$logger.Log('Info', "Restored successfully. ($relativePath)")
 			}
-			else {
-				$logger.Log('Critical', "Failed to restore backup. ($relativePath)")
+			catch {
+				$logger.Log('Critical', "Failed to restore backup. ($relativePath): $_")
 				exit 1
 			}
 		}
