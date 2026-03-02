@@ -78,6 +78,14 @@ function DeployLatestArtifact() {
 		exit 1
 	}
 
+	# Build the exclusion list up front so it applies to both deletion and copy.
+	$excludedNames = @()
+	if ($null -ne $FileExclusions) {
+		$excludedNames += $FileExclusions
+	}
+	$excludedNames += ($script:backupTargets | ForEach-Object { $_.filename })
+	$excludedNames = @($excludedNames | Select-Object -Unique)
+
 	if (-not (Test-Path -Path $script:targetDir)) {
 		$logger.Log('Debug', 'Creating target directory...')
 		New-Item -ItemType Directory -Path $script:targetDir -Force | Out-Null
@@ -91,13 +99,6 @@ function DeployLatestArtifact() {
 	}
 	else {
 		$logger.Log('Debug', 'Clearing deployment target directory contents...')
-
-		$excludedNames = @()
-		if ($null -ne $FileExclusions) {
-			$excludedNames += $FileExclusions
-		}
-		$excludedNames += ($script:backupTargets | ForEach-Object { $_.filename })
-		$excludedNames = @($excludedNames | Select-Object -Unique)
 
 		$errorList = @()
 		$targets = @(Get-ChildItem -Path $script:targetDir -Force)
@@ -125,7 +126,8 @@ function DeployLatestArtifact() {
 	}
 
 	$logger.Log('Info', 'Deploying latest WASM artifact...')
-	$itemsToCopy = Get-ChildItem -Path $script:sourceDir -Recurse -Force
+	$itemsToCopy = Get-ChildItem -Path $script:sourceDir -Recurse -Force |
+		Where-Object { $excludedNames -notcontains $_.Name }
 	foreach ($item in $itemsToCopy) {
 		$relativePath = $item.FullName.Substring($script:sourceDir.Length).TrimStart('\\')
 		$destinationPath = Join-Path -Path $script:targetDir -ChildPath $relativePath
