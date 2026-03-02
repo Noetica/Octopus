@@ -101,9 +101,15 @@ function DeployLatestArtifact() {
 		$logger.Log('Debug', 'Clearing deployment target directory contents...')
 
 		$errorList = @()
+		# Build full excluded paths from relative exclusions so the match is path-based
+		# (consistent with setup-api.ps1) rather than filename-only. Exclusions may be
+		# simple filenames (e.g. "appsettings.json") or relative paths (e.g. "config\local.json").
+		$excludedPaths = @($excludedNames | ForEach-Object { Join-Path $script:targetDir $_ })
+		# Enumerate only top-level items and remove each non-excluded subtree in one shot,
+		# avoiding ordering issues that arise from recursive enumeration + individual deletes.
 		$targets = @(Get-ChildItem -Path $script:targetDir -Force)
 		foreach ($item in $targets) {
-			if ($excludedNames -contains $item.Name) {
+			if ($excludedPaths -contains $item.FullName) {
 				$logger.Log('Debug', "Skipping excluded item. ($($item.FullName))")
 				continue
 			}
