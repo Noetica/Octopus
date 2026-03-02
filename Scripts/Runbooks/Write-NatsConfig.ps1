@@ -27,8 +27,8 @@
 
 .NOTES
     Requires the Octopus variable 'Noetica.NatsServerUrl' to be defined.
-    The [SynthesysSwitch] section must exist in the INF file, or use
-    -CreateMissingSections if it may be absent.
+    The [SynthesysSwitch] section will be created automatically if it does not
+    already exist in the INF file.
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
