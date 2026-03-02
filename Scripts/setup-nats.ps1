@@ -56,5 +56,7 @@ if ($WhatIfPreference) {
     $params['WhatIf'] = $true
 }
 
-Write-Host "Configuring NATS settings in synthesys.inf..."
-& $writeNatsScript @params
+if ($PSCmdlet.ShouldProcess('synthesys.inf', 'Write NatsUrl')) {
+    Write-Host "Configuring NATS settings in synthesys.inf..."
+    & $writeNatsScript @params
+}
