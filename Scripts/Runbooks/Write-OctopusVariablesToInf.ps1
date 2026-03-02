@@ -60,8 +60,9 @@ function ConvertTo-MappingObject {
 
 function Find-SectionBounds {
     param(
+        # Untyped to avoid PS 5.1 coercion issues with Object[] vs string[]
         [Parameter(Mandatory = $true)]
-        [string[]]$Lines,
+        $Lines,
 
         [Parameter(Mandatory = $true)]
         [string]$SectionName
@@ -111,26 +112,27 @@ if (-not (Test-Path -LiteralPath $InfPath)) {
 $resolvedPath = (Resolve-Path -LiteralPath $InfPath).Path
 $mappingsToApply = @($Mappings | ForEach-Object { ConvertTo-MappingObject -Mapping $_ })
 
-$rawLines = Get-Content -LiteralPath $resolvedPath -Encoding $Encoding
-$updatedLines = New-Object System.Collections.Generic.List[string]
-# Use Add() per element rather than AddRange() to avoid PS 5.1 Object[] / string[] type mismatch
-foreach ($line in $rawLines) { $updatedLines.Add([string]$line) }
+# Use ArrayList (no type constraints) to avoid PS 5.1 generic List[string] coercion issues
+$updatedLines = New-Object System.Collections.ArrayList
+foreach ($line in (Get-Content -LiteralPath $resolvedPath -Encoding $Encoding)) {
+    [void]$updatedLines.Add($line)
+}
 
 $changes = 0
 
 foreach ($mapping in $mappingsToApply) {
-    $sectionBounds = Find-SectionBounds -Lines ([string[]]($updatedLines | ForEach-Object { [string]$_ })) -SectionName $mapping.Section
+    $sectionBounds = Find-SectionBounds -Lines $updatedLines -SectionName $mapping.Section
     if ($null -eq $sectionBounds) {
         if (-not $CreateMissingSections) {
             throw "Section [$($mapping.Section)] was not found. Use -CreateMissingSections to add it."
         }
 
         if ($updatedLines.Count -gt 0 -and $updatedLines[$updatedLines.Count - 1].Trim() -ne '') {
-            $updatedLines.Add('')
+            [void]$updatedLines.Add('')
         }
 
-        $updatedLines.Add("[$($mapping.Section)]")
-        $updatedLines.Add("$($mapping.Key)=$(Get-OctopusVariableValue -Name $mapping.VariableName)")
+        [void]$updatedLines.Add("[$($mapping.Section)]")
+        [void]$updatedLines.Add("$($mapping.Key)=$(Get-OctopusVariableValue -Name $mapping.VariableName)")
         $changes++
         continue
     }
