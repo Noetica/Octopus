@@ -138,10 +138,18 @@ function DeployLatestArtifact() {
 	else {
 		$logger.Log('Debug', 'Clearing deployment target directory contents...')
 
-		# Build full excluded paths from relative exclusions so the match is path-based
-		# (consistent with setup-api.ps1) rather than filename-only. Exclusions may be
-		# simple filenames (e.g. "appsettings.json") or relative paths (e.g. "config\local.json").
-		$excludedPaths = @($excludedNames | ForEach-Object { Join-Path $script:targetDir $_ })
+		# Build full excluded paths: path-based entries (containing a separator) are
+		# resolved directly; simple filename entries are matched recursively so every
+		# copy of that file at any depth in the target tree is preserved during clean-up.
+		$excludedPaths = @($excludedNames | ForEach-Object {
+			$entry = $_
+			if ($entry -match '[/\\]') {
+				Join-Path $script:targetDir $entry
+			} else {
+				@(Get-ChildItem -Path $script:targetDir -Recurse -File -Filter $entry -ErrorAction SilentlyContinue |
+					Select-Object -ExpandProperty FullName)
+			}
+		})
 		# Remove-NonExcludedItems handles nested exclusions: if an excluded path lives inside
 		# a subdirectory, that directory is descended into rather than deleted wholesale.
 		$errorList = @(Remove-NonExcludedItems -Directory $script:targetDir -ExcludedPaths $excludedPaths)
@@ -158,9 +166,13 @@ function DeployLatestArtifact() {
 	foreach ($item in $itemsToCopy) {
 		$relativePath = $item.FullName.Substring($script:sourceDir.Length).TrimStart('\\')
 
-		# Exclude by relative path so entries like "config\local.json" are matched correctly,
-		# not just by filename which would wrongly match unrelated files in other directories.
-		if ($excludedNames -contains $relativePath) {
+		# Exclude path-based entries (e.g. "config\local.json") by relative path and
+		# simple filename entries (e.g. "appsettings.json") by name, so a plain filename
+		# matches the file at any depth — consistent with the clean-up behaviour above.
+		$isExcluded = @($excludedNames | Where-Object {
+			if ($_ -match '[/\\]') { $relativePath -eq $_ } else { $item.Name -eq $_ }
+		}).Count -gt 0
+		if ($isExcluded) {
 			$logger.Log('Debug', "Skipping excluded file during copy. ($relativePath)")
 			continue
 		}
