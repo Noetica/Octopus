@@ -111,14 +111,15 @@ if (-not (Test-Path -LiteralPath $InfPath)) {
 $resolvedPath = (Resolve-Path -LiteralPath $InfPath).Path
 $mappingsToApply = @($Mappings | ForEach-Object { ConvertTo-MappingObject -Mapping $_ })
 
-$lines = [string[]](Get-Content -LiteralPath $resolvedPath -Encoding $Encoding)
+$rawLines = Get-Content -LiteralPath $resolvedPath -Encoding $Encoding
+$lines = if ($null -eq $rawLines) { [string[]]@() } else { [string[]]@($rawLines) }
 $updatedLines = New-Object System.Collections.Generic.List[string]
-$updatedLines.AddRange($lines)
+if ($lines.Count -gt 0) { $updatedLines.AddRange($lines) }
 
 $changes = 0
 
 foreach ($mapping in $mappingsToApply) {
-    $sectionBounds = Find-SectionBounds -Lines $updatedLines.ToArray() -SectionName $mapping.Section
+    $sectionBounds = Find-SectionBounds -Lines ([string[]]@($updatedLines)) -SectionName $mapping.Section
     if ($null -eq $sectionBounds) {
         if (-not $CreateMissingSections) {
             throw "Section [$($mapping.Section)] was not found. Use -CreateMissingSections to add it."
