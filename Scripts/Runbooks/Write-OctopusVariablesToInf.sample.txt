@@ -1,0 +1,23 @@
+# Sample mappings for Write-OctopusVariablesToInf.ps1
+#
+# Format:
+# Section|Key|Octopus.VariableName
+#
+# Example PowerShell usage in an Octopus script step:
+#   $mappings = Get-Content ".\Scripts\Runbooks\Write-OctopusVariablesToInf.sample.txt" |
+#     Where-Object { $_ -and -not $_.TrimStart().StartsWith('#') }
+#   .\Scripts\Runbooks\Write-OctopusVariablesToInf.ps1 -Mappings $mappings -CreateMissingSections
+
+Predictive|DefaultCountryCode|Tenant.DefaultCountryCode
+
+Database|Server|Noetica.Database.Server
+Database|Name|Noetica.Database.Name
+Database|UID|Noetica.Database.UID
+Database|PWD|Noetica.Database.PWD
+
+Logging|Level|Noetica.LogLevel
+
+Paths|AppRoot|Noetica.AppRoot
+Paths|EtcRoot|Noetica.EtcRoot
+Paths|VoiceRoot|Noetica.VoiceRoot
+Paths|WebRoot|Noetica.WebRoot
