@@ -181,6 +181,22 @@ if ($PSCmdlet.ShouldProcess(".NET $DotNetMajorVersion $RuntimeType", "Download a
         exit 1
     }
 
+    # Verify Authenticode signature before executing — guards against a compromised
+    # download endpoint or a man-in-the-middle substitution.
+    Write-Host "Verifying installer signature..."
+    $sig = Get-AuthenticodeSignature -FilePath $tempPath
+    if ($sig.Status -ne 'Valid') {
+        Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
+        Write-Error "Installer signature is invalid or untrusted (status: $($sig.Status)). Aborting installation."
+        exit 1
+    }
+    if ($sig.SignerCertificate.Subject -notmatch 'Microsoft') {
+        Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
+        Write-Error "Installer is not signed by Microsoft (signer: $($sig.SignerCertificate.Subject)). Aborting installation."
+        exit 1
+    }
+    Write-Host "Signature verified: $($sig.SignerCertificate.Subject)"
+
     # Install
     $exitCode = Install-DotNetRuntime -InstallerPath $tempPath
 
