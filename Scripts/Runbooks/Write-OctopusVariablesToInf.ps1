@@ -111,7 +111,7 @@ if (-not (Test-Path -LiteralPath $InfPath)) {
 $resolvedPath = (Resolve-Path -LiteralPath $InfPath).Path
 $mappingsToApply = @($Mappings | ForEach-Object { ConvertTo-MappingObject -Mapping $_ })
 
-$lines = Get-Content -LiteralPath $resolvedPath -Encoding $Encoding
+$lines = [string[]](Get-Content -LiteralPath $resolvedPath -Encoding $Encoding)
 $updatedLines = New-Object System.Collections.Generic.List[string]
 $updatedLines.AddRange($lines)
 
