@@ -72,6 +72,44 @@ function CheckExistingDeployment() {
 	}
 }
 
+# Recursively removes all items under $Directory that are not in $ExcludedPaths and are
+# not ancestor directories of any excluded path. Returns an array of error message strings.
+function Remove-NonExcludedItems {
+	param(
+		[string]$Directory,
+		[string[]]$ExcludedPaths
+	)
+
+	$errors = @()
+	foreach ($item in @(Get-ChildItem -LiteralPath $Directory -Force)) {
+		if ($ExcludedPaths -contains $item.FullName) {
+			$logger.Log('Debug', "Skipping excluded item. ($($item.FullName))")
+			continue
+		}
+
+		# If this directory is an ancestor of an excluded path, recurse into it rather
+		# than deleting the whole subtree — otherwise excluded nested files would be lost.
+		if ($item.PSIsContainer) {
+			$hasExcludedDescendant = @($ExcludedPaths | Where-Object { $_ -like "$($item.FullName)\*" }).Count -gt 0
+			if ($hasExcludedDescendant) {
+				$logger.Log('Debug', "Descending into directory containing excluded items. ($($item.FullName))")
+				$errors += Remove-NonExcludedItems -Directory $item.FullName -ExcludedPaths $ExcludedPaths
+				continue
+			}
+		}
+
+		try {
+			Remove-Item -LiteralPath $item.FullName -Force -Recurse -ErrorAction Stop
+			$logger.Log('Debug', "Deleted successfully. ($($item.FullName))")
+		}
+		catch {
+			$errors += "Failed to delete: $($item.FullName) | Error: $($_.Exception.Message)"
+			$logger.Log('Error', "Failed to delete. ($($item.FullName))")
+		}
+	}
+	return $errors
+}
+
 function DeployLatestArtifact() {
 	if (-not (Test-Path -Path $script:sourceDir)) {
 		$logger.Log('Critical', "Source directory does not exist. ($($script:sourceDir))")
@@ -100,29 +138,13 @@ function DeployLatestArtifact() {
 	else {
 		$logger.Log('Debug', 'Clearing deployment target directory contents...')
 
-		$errorList = @()
 		# Build full excluded paths from relative exclusions so the match is path-based
 		# (consistent with setup-api.ps1) rather than filename-only. Exclusions may be
 		# simple filenames (e.g. "appsettings.json") or relative paths (e.g. "config\local.json").
 		$excludedPaths = @($excludedNames | ForEach-Object { Join-Path $script:targetDir $_ })
-		# Enumerate only top-level items and remove each non-excluded subtree in one shot,
-		# avoiding ordering issues that arise from recursive enumeration + individual deletes.
-		$targets = @(Get-ChildItem -Path $script:targetDir -Force)
-		foreach ($item in $targets) {
-			if ($excludedPaths -contains $item.FullName) {
-				$logger.Log('Debug', "Skipping excluded item. ($($item.FullName))")
-				continue
-			}
-
-			try {
-				Remove-Item -LiteralPath $item.FullName -Force -Recurse -ErrorAction Stop
-				$logger.Log('Debug', "Deleted successfully. ($($item.FullName))")
-			}
-			catch {
-				$errorList += "Failed to delete: $($item.FullName) | Error: $($_.Exception.Message)"
-				$logger.Log('Error', "Failed to delete. ($($item.FullName))")
-			}
-		}
+		# Remove-NonExcludedItems handles nested exclusions: if an excluded path lives inside
+		# a subdirectory, that directory is descended into rather than deleted wholesale.
+		$errorList = @(Remove-NonExcludedItems -Directory $script:targetDir -ExcludedPaths $excludedPaths)
 
 		if ($errorList.Count -gt 0) {
 			$logger.Log('Error', 'Error(s) occurred during target clean-up:')
