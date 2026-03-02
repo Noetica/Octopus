@@ -154,10 +154,17 @@ function DeployLatestArtifact() {
 	}
 
 	$logger.Log('Info', 'Deploying latest WASM artifact...')
-	$itemsToCopy = Get-ChildItem -Path $script:sourceDir -Recurse -Force |
-		Where-Object { $excludedNames -notcontains $_.Name }
+	$itemsToCopy = Get-ChildItem -Path $script:sourceDir -Recurse -Force
 	foreach ($item in $itemsToCopy) {
 		$relativePath = $item.FullName.Substring($script:sourceDir.Length).TrimStart('\\')
+
+		# Exclude by relative path so entries like "config\local.json" are matched correctly,
+		# not just by filename which would wrongly match unrelated files in other directories.
+		if ($excludedNames -contains $relativePath) {
+			$logger.Log('Debug', "Skipping excluded file during copy. ($relativePath)")
+			continue
+		}
+
 		$destinationPath = Join-Path -Path $script:targetDir -ChildPath $relativePath
 
 		if ($item.PSIsContainer) {
