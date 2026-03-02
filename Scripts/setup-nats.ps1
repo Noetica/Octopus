@@ -27,6 +27,12 @@
 
 [CmdletBinding(SupportsShouldProcess)]
 param(
+    # Standard Octopus deployment step parameters - accepted but not used by this script
+    [Parameter(Mandatory = $false)] [string]$AppName,
+    [Parameter(Mandatory = $false)] [string]$SourceDir,
+    [Parameter(Mandatory = $false)] [string]$TargetDir,
+    [Parameter(Mandatory = $false)] [string[]]$FileExclusions,
+
     [Parameter(Mandatory = $false)]
     [string]$InfPath
 )
