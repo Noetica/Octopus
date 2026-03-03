@@ -39,10 +39,10 @@ param(
 
 Write-Output "The script is running from: $PSScriptRoot"
 
-$writeNatsTenantScript = Join-Path $PSScriptRoot 'Runbooks\Write-NatsTenantConfig.ps1'
+$writeNatsTenantScript = Join-Path $PSScriptRoot 'Runbooks\Write-TenantConfig.ps1'
 
 if (-not (Test-Path $writeNatsTenantScript)) {
-    Write-Error "Could not find Write-NatsTenantConfig.ps1 at: $writeNatsTenantScript"
+    Write-Error "Could not find Write-TenantConfig.ps1 at: $writeNatsTenantScript"
     exit 1
 }
 
