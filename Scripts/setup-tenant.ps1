@@ -5,14 +5,14 @@
 .DESCRIPTION
     Calls Write-TenantConfig.ps1 to write the NatsTenant value into the
     [SynthesysSwitch] section of synthesys.inf using the Octopus variable
-    'Tenant.Tenant'.
+    'TenantName'.
 
     The INF file path is read from the Octopus variable 'Noetica.Inf' unless
     overridden with -InfPath.
 
 .PARAMETER TenantName
     The tenant name to write. If omitted, the value is read from the Octopus
-    variable 'Tenant.Tenant'. In Octopus, set this to '#{Tenant.Tenant}'.
+    variable 'TenantName'. In Octopus, set this to '#{TenantName}'.
 
 .PARAMETER InfPath
     Path to synthesys.inf. Defaults to the Octopus variable 'Noetica.Inf'.

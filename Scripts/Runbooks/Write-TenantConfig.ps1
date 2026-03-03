@@ -4,12 +4,12 @@
 
 .DESCRIPTION
     Updates the TenantName key in the [SynthesysSwitch] section of synthesys.inf
-    using the value from the Octopus variable 'Tenant.Tenant'.
+    using the value from the Octopus variable 'TenantName'.
 
     The INF file path is read from the Octopus variable 'Noetica.Inf'.
 
     This script is a thin wrapper around Write-OctopusVariablesToInf.ps1.
-    The tenant name is read from the Octopus variable 'Tenant.Tenant'.
+    The tenant name is read from the Octopus variable 'TenantName'.
 
 .PARAMETER TenantName
     The tenant name to write. If omitted, the value is read from the Octopus
@@ -30,7 +30,7 @@
     Shows what would be written without making any changes.
 
 .NOTES
-    If TenantName is not supplied, requires the Octopus variable 'Tenant.Tenant'.
+    If TenantName is not supplied, requires the Octopus variable 'TenantName'.
     The [SynthesysSwitch] section will be created automatically if it does not
     already exist in the INF file.
 #>
@@ -52,14 +52,14 @@ if (-not (Test-Path $writeInfScript)) {
     exit 1
 }
 
-# If TenantName was passed directly (e.g. via #{Tenant.Tenant} in Octopus), inject it
+# If TenantName was passed directly (e.g. via #{TenantName} in Octopus), inject it
 # into $OctopusParameters so the core engine picks it up via the standard mapping.
 if (-not [string]::IsNullOrWhiteSpace($TenantName)) {
-    $OctopusParameters['Tenant.Tenant'] = $TenantName
+    $OctopusParameters['TenantName'] = $TenantName
 }
 
 $mappings = @(
-    'SynthesysSwitch|TenantName|Tenant.Tenant'
+    'SynthesysSwitch|TenantName|TenantName'
 )
 
 $params = @{
@@ -75,6 +75,6 @@ if ($WhatIfPreference) {
     $params['WhatIf'] = $true
 }
 
-Write-Host "Writing TenantName to synthesys.inf from Octopus variable 'Tenant.Tenant'..."
+Write-Host "Writing TenantName to synthesys.inf from Octopus variable 'TenantName'..."
 
 & $writeInfScript @params
