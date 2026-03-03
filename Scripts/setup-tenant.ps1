@@ -61,7 +61,7 @@ if ($WhatIfPreference) {
     $params['WhatIf'] = $true
 }
 
-if ($PSCmdlet.ShouldProcess('synthesys.inf', 'Write NatsTenant')) {
-    Write-Host "Configuring NATS tenant name in synthesys.inf..."
+if ($PSCmdlet.ShouldProcess('synthesys.inf', 'Write TenantName')) {
+    Write-Host "Configuring tenant name in synthesys.inf..."
     & $writeNatsTenantScript @params
 }

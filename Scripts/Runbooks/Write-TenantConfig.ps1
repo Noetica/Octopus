@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Writes the NatsTenant value to synthesys.inf from an Octopus variable.
+    Writes the TenantName value to synthesys.inf from an Octopus variable.
 
 .DESCRIPTION
-    Updates the NatsTenant key in the [SynthesysSwitch] section of synthesys.inf
+    Updates the TenantName key in the [SynthesysSwitch] section of synthesys.inf
     using the value from the Octopus variable 'Tenant.Tenant'.
 
     The INF file path is read from the Octopus variable 'Noetica.Inf'.
@@ -59,7 +59,7 @@ if (-not [string]::IsNullOrWhiteSpace($TenantName)) {
 }
 
 $mappings = @(
-    'SynthesysSwitch|NatsTenant|Tenant.Tenant'
+    'SynthesysSwitch|TenantName|Tenant.Tenant'
 )
 
 $params = @{
@@ -75,6 +75,6 @@ if ($WhatIfPreference) {
     $params['WhatIf'] = $true
 }
 
-Write-Host "Writing NatsTenant to synthesys.inf from Octopus variable 'Tenant.Tenant'..."
+Write-Host "Writing TenantName to synthesys.inf from Octopus variable 'Tenant.Tenant'..."
 
 & $writeInfScript @params
