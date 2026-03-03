@@ -10,6 +10,10 @@
     The INF file path is read from the Octopus variable 'Noetica.Inf' unless
     overridden with -InfPath.
 
+.PARAMETER TenantName
+    The tenant name to write. If omitted, the value is read from the Octopus
+    variable 'Noetica.NatsTenantName'. In Octopus, set this to '#{Tenant.Tenant}'.
+
 .PARAMETER InfPath
     Path to synthesys.inf. Defaults to the Octopus variable 'Noetica.Inf'.
 
@@ -17,16 +21,19 @@
     Shows what would be written without making any changes.
 
 .EXAMPLE
-    .\setup-nats-tenant.ps1
-    Writes NatsTenant into synthesys.inf using Octopus variable values.
+    .\setup-tenant.ps1 -TenantName 'my-tenant'
+    Writes NatsTenant into synthesys.inf using the supplied tenant name.
 
 .EXAMPLE
-    .\setup-nats-tenant.ps1 -InfPath "C:\Synthesys\synthesys.inf" -WhatIf
+    .\setup-tenant.ps1 -InfPath "C:\Synthesys\synthesys.inf" -WhatIf
     Shows what would be written without making any changes.
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
 param(
+    [Parameter(Mandatory = $false)]
+    [string]$TenantName,
+
     [Parameter(Mandatory = $false)]
     [string]$InfPath
 )
@@ -41,6 +48,10 @@ if (-not (Test-Path $writeNatsTenantScript)) {
 }
 
 $params = @{}
+
+if (-not [string]::IsNullOrWhiteSpace($TenantName)) {
+    $params['TenantName'] = $TenantName
+}
 
 if (-not [string]::IsNullOrWhiteSpace($InfPath)) {
     $params['InfPath'] = $InfPath
