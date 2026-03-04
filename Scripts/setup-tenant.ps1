@@ -50,7 +50,9 @@ if (-not (Test-Path $writeTenantConfigScript)) {
 
 # Resolve InfPath: prefer explicit param, fall back to Octopus variable.
 if ([string]::IsNullOrWhiteSpace($InfPath)) {
-    $InfPath = $OctopusParameters['Noetica.Inf']
+    if ($null -ne $OctopusParameters -and $OctopusParameters.ContainsKey('Noetica.Inf')) {
+        $InfPath = $OctopusParameters['Noetica.Inf']
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($InfPath)) {
@@ -60,7 +62,9 @@ if ([string]::IsNullOrWhiteSpace($InfPath)) {
 
 # Resolve TenantName: prefer explicit param, fall back to Octopus variable.
 if ([string]::IsNullOrWhiteSpace($TenantName)) {
-    $TenantName = $OctopusParameters['TenantName']
+    if ($null -ne $OctopusParameters -and $OctopusParameters.ContainsKey('TenantName')) {
+        $TenantName = $OctopusParameters['TenantName']
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($TenantName)) {

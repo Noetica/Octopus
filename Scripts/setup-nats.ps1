@@ -50,7 +50,9 @@ if (-not (Test-Path $writeNatsScript)) {
 
 # Resolve InfPath: prefer explicit param, fall back to Octopus variable.
 if ([string]::IsNullOrWhiteSpace($InfPath)) {
-    $InfPath = $OctopusParameters['Noetica.Inf']
+    if ($null -ne $OctopusParameters -and $OctopusParameters.ContainsKey('Noetica.Inf')) {
+        $InfPath = $OctopusParameters['Noetica.Inf']
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($InfPath)) {
@@ -60,7 +62,9 @@ if ([string]::IsNullOrWhiteSpace($InfPath)) {
 
 # Resolve NatsUrl: prefer explicit param, fall back to Octopus variable.
 if ([string]::IsNullOrWhiteSpace($NatsUrl)) {
-    $NatsUrl = $OctopusParameters['Noetica.NatsServerUrl']
+    if ($null -ne $OctopusParameters -and $OctopusParameters.ContainsKey('Noetica.NatsServerUrl')) {
+        $NatsUrl = $OctopusParameters['Noetica.NatsServerUrl']
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($NatsUrl)) {
