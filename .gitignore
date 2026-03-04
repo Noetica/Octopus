@@ -25,3 +25,6 @@ synthesys.*
 # Ignore sensitive REG files in any location
 **/synthesys.*.reg
 **/synthesys.reg
+
+# Ignore git-filter-repo/rewrite working directories
+.git-rewrite/
