@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Configures the NATS tenant name in synthesys.inf.
+    Configures the tenant name in synthesys.inf.
 
 .DESCRIPTION
     Calls Write-TenantConfig.ps1 to write the TenantName value into the
