@@ -1,36 +1,36 @@
 <#
 .SYNOPSIS
-    Writes the NatsUrl value to synthesys.inf.
+    Writes the TenantName value to synthesys.inf.
 
 .DESCRIPTION
-    Updates the NatsUrl key in the [System] section of synthesys.inf.
+    Updates the TenantName key in the [System] section of synthesys.inf.
     The [System] section will be created automatically if it does not already exist.
 
     This script delegates INF file writing to Write-OctopusVariablesToInf.ps1.
 
-.PARAMETER NatsUrl
-    The NATS server URL to write (e.g. 'nats://localhost:4222').
+.PARAMETER TenantName
+    The tenant name to write (e.g. 'contoso').
 
 .PARAMETER InfPath
     Path to synthesys.inf.
 
 .EXAMPLE
-    .\Write-NatsConfig.ps1 -NatsUrl 'nats://myserver:4222' -InfPath 'C:\Synthesys\synthesys.inf'
-    Writes NatsUrl into synthesys.inf [System]::NatsUrl.
+    .\Write-TenantConfig.ps1 -TenantName 'my-tenant' -InfPath 'C:\Synthesys\synthesys.inf'
+    Writes TenantName into synthesys.inf [System]::TenantName.
 #>
 
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
-    [string]$NatsUrl,
+    [string]$TenantName,
 
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
     [string]$InfPath
 )
 
-$scriptRoot    = Split-Path -Parent $MyInvocation.MyCommand.Path
+$scriptRoot     = Split-Path -Parent $MyInvocation.MyCommand.Path
 $writeInfScript = Join-Path $scriptRoot 'Write-OctopusVariablesToInf.ps1'
 
 if (-not (Test-Path $writeInfScript)) {
@@ -40,10 +40,10 @@ if (-not (Test-Path $writeInfScript)) {
 
 # The helper resolves values via $OctopusParameters. Inject the supplied value
 # under the key used in the mapping so the helper works without an Octopus context.
-$OctopusParameters = @{ 'NatsUrl' = $NatsUrl }
+$OctopusParameters = @{ 'TenantName' = $TenantName }
 
 $params = @{
-    Mappings              = @('System|NatsUrl|NatsUrl')
+    Mappings              = @('System|TenantName|TenantName')
     InfPath               = $InfPath
     CreateMissingSections = $true
 }
