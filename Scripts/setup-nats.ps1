@@ -1,14 +1,19 @@
 <#
 .SYNOPSIS
-    Configures the NATS server URL in synthesys.inf as part of an Octopus deployment.
+    Configures the NATS server URL in synthesys.inf.
 
 .DESCRIPTION
     Calls Write-NatsConfig.ps1 to write the NatsUrl value into the
-    [SynthesysSwitch] section of synthesys.inf using the Octopus variable
-    'Noetica.NatsServerUrl'.
+    [System] section of synthesys.inf.
+    When run inside Octopus the value is read from the variable 'Noetica.NatsServerUrl'.
+    When run standalone, supply -NatsUrl directly.
 
-    The INF file path is read from the Octopus variable 'Noetica.Inf' unless
-    overridden with -InfPath.
+    The INF file path defaults to the Octopus variable 'Noetica.Inf' or can be
+    supplied via -InfPath.
+
+.PARAMETER NatsUrl
+    The NATS server URL to write (e.g. 'nats://myserver:4222').
+    If omitted, the value is read from the Octopus variable 'Noetica.NatsServerUrl'.
 
 .PARAMETER InfPath
     Path to synthesys.inf. Defaults to the Octopus variable 'Noetica.Inf'.
@@ -17,21 +22,18 @@
     Shows what would be written without making any changes.
 
 .EXAMPLE
-    .\setup-nats.ps1
-    Writes NatsUrl into synthesys.inf using Octopus variable values.
+    .\setup-nats.ps1 -NatsUrl 'nats://myserver:4222' -InfPath 'C:\Synthesys\synthesys.inf'
+    Writes NatsUrl into synthesys.inf [System]::NatsUrl using the supplied value.
 
 .EXAMPLE
-    .\setup-nats.ps1 -InfPath "C:\Synthesys\synthesys.inf" -WhatIf
+    .\setup-nats.ps1 -InfPath 'C:\Synthesys\synthesys.inf' -WhatIf
     Shows what would be written without making any changes.
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    # Standard Octopus deployment step parameters - accepted but not used by this script
-    [Parameter(Mandatory = $false)] [string]$AppName,
-    [Parameter(Mandatory = $false)] [string]$SourceDir,
-    [Parameter(Mandatory = $false)] [string]$TargetDir,
-    [Parameter(Mandatory = $false)] [string[]]$FileExclusions,
+    [Parameter(Mandatory = $false)]
+    [string]$NatsUrl,
 
     [Parameter(Mandatory = $false)]
     [string]$InfPath
@@ -46,17 +48,34 @@ if (-not (Test-Path $writeNatsScript)) {
     exit 1
 }
 
-$params = @{}
-
-if (-not [string]::IsNullOrWhiteSpace($InfPath)) {
-    $params['InfPath'] = $InfPath
+# Resolve InfPath: prefer explicit param, fall back to Octopus variable.
+if ([string]::IsNullOrWhiteSpace($InfPath)) {
+    if ($null -ne $OctopusParameters -and $OctopusParameters.ContainsKey('Noetica.Inf')) {
+        $InfPath = $OctopusParameters['Noetica.Inf']
+    }
 }
 
-if ($WhatIfPreference) {
-    $params['WhatIf'] = $true
+if ([string]::IsNullOrWhiteSpace($InfPath)) {
+    Write-Error 'InfPath was not supplied and Octopus variable Noetica.Inf is not set.'
+    exit 1
 }
 
-if ($PSCmdlet.ShouldProcess('synthesys.inf', 'Write NatsUrl')) {
-    Write-Host "Configuring NATS settings in synthesys.inf..."
-    & $writeNatsScript @params
+# Resolve NatsUrl: prefer explicit param, fall back to Octopus variable.
+if ([string]::IsNullOrWhiteSpace($NatsUrl)) {
+    if ($null -ne $OctopusParameters -and $OctopusParameters.ContainsKey('Noetica.NatsServerUrl')) {
+        $NatsUrl = $OctopusParameters['Noetica.NatsServerUrl']
+    }
 }
+
+if ([string]::IsNullOrWhiteSpace($NatsUrl)) {
+    Write-Error 'NatsUrl was not supplied and Octopus variable Noetica.NatsServerUrl is not set.'
+    exit 1
+}
+
+$params = @{
+    NatsUrl = $NatsUrl
+    InfPath = $InfPath
+}
+
+Write-Host "Configuring NATS settings in synthesys.inf..."
+& $writeNatsScript @params
