@@ -27,11 +27,11 @@
     any changes.
 
 .EXAMPLE
-    .\Setup-DevMachineSipTrunks.ps1
+    .\setup-devmachinesiptrunks.ps1
     Checks and applies any missing SIP trunk groups, restarting VoicePlatform.
 
 .EXAMPLE
-    .\Setup-DevMachineSipTrunks.ps1 -WhatIf
+    .\setup-devmachinesiptrunks.ps1 -WhatIf
     Shows which groups are missing without making changes.
 
 .NOTES
