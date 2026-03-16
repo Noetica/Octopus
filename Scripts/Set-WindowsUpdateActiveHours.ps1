@@ -64,17 +64,36 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 
 $regPath = "HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"
 
+# --- Ensure the registry key exists (create it if absent, e.g. on a fresh OS install) ---
+if (-not (Test-Path $regPath)) {
+    Write-Host "Registry key not found - creating: $regPath"
+    try {
+        New-Item -Path $regPath -Force -ErrorAction Stop | Out-Null
+    }
+    catch {
+        Write-Error "Failed to create registry key '$regPath': $($_.Exception.Message)"
+        exit 1
+    }
+}
+
 Write-Host "Setting Windows Update Active Hours..."
 Write-Host "  Start : $StartHour:00 ($([datetime]::Today.AddHours($StartHour).ToString('h tt')))"
 Write-Host "  End   : $EndHour:00 ($([datetime]::Today.AddHours($EndHour).ToString('h tt')))"
 Write-Host "  Window: $windowSize hours"
 
-Set-ItemProperty -Path $regPath -Name "ActiveHoursStart" -Value $StartHour -Type DWord
-Set-ItemProperty -Path $regPath -Name "ActiveHoursEnd"   -Value $EndHour   -Type DWord
+try {
+    Set-ItemProperty -Path $regPath -Name "ActiveHoursStart" -Value $StartHour -Type DWord -ErrorAction Stop
+    Set-ItemProperty -Path $regPath -Name "ActiveHoursEnd"   -Value $EndHour   -Type DWord -ErrorAction Stop
 
-if ($DisableSmartActiveHours) {
-    Write-Host "  Smart Active Hours: Disabled (Windows will not auto-adjust the window)"
-    Set-ItemProperty -Path $regPath -Name "SmartActiveHoursSuggestionState" -Value 0 -Type DWord
+    if ($DisableSmartActiveHours) {
+        Write-Host "  Smart Active Hours: Disabled (Windows will not auto-adjust the window)"
+        Set-ItemProperty -Path $regPath -Name "SmartActiveHoursSuggestionState" -Value 0 -Type DWord -ErrorAction Stop
+    }
+}
+catch {
+    Write-Error "Failed to write registry values to '$regPath': $($_.Exception.Message)"
+    Write-Error "Ensure the script is running as Administrator and the key is not protected by policy."
+    exit 1
 }
 
 Write-Host ""

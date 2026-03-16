@@ -188,6 +188,12 @@ function Start-VoicePlatformIfStopped {
 # ---------------------------------------------------------------------------
 # Apply missing groups
 # ---------------------------------------------------------------------------
+
+# Capture initial service state BEFORE stopping so we can restore it faithfully.
+# If the service was already stopped before this script ran, we must not start it
+# on the way out - that would silently change the machine's prior state.
+$vpInitialStatus = (Get-Service -Name 'VoicePlatform' -ErrorAction SilentlyContinue)?.Status
+
 Write-Output "${newline}Stopping VoicePlatform before applying registry changes..."
 Stop-VoicePlatformIfRunning
 
@@ -227,8 +233,13 @@ foreach ($trunk in $missingTrunks) {
 # ---------------------------------------------------------------------------
 # Restart service and report
 # ---------------------------------------------------------------------------
-Write-Output "${newline}Restarting VoicePlatform service..."
-Start-VoicePlatformIfStopped
+if ($vpInitialStatus -eq 'Running') {
+    Write-Output "${newline}Restarting VoicePlatform service (it was running before this script ran)..."
+    Start-VoicePlatformIfStopped
+}
+else {
+    Write-Output "${newline}VoicePlatform service was not running before this script ran - leaving it stopped."
+}
 
 Write-Output "${newline}=== Summary ==="
 Write-Output "  Already present : $($presentTrunks.Count)"
