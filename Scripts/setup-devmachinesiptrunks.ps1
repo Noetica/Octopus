@@ -137,7 +137,7 @@ if ($missingTrunks.Count -eq 0) {
 # ---------------------------------------------------------------------------
 # Service control helpers
 # ---------------------------------------------------------------------------
-$utilsPath     = Join-Path $PSScriptRoot '..\..\utils'
+$utilsPath     = Join-Path $PSScriptRoot 'utils'
 $scmScriptPath = Join-Path $utilsPath 'control-scm.ps1'
 $hasScm        = Test-Path $scmScriptPath
 
