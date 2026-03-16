@@ -135,19 +135,6 @@ if ($missingTrunks.Count -eq 0) {
 }
 
 # ---------------------------------------------------------------------------
-# WhatIf mode - report only, no changes
-# ---------------------------------------------------------------------------
-if ($WhatIfPreference) {
-    Write-Output "${newline}========== WhatIf: No changes will be made =========="
-    foreach ($trunk in $missingTrunks) {
-        Write-Output "  WhatIf: Would create registry key '$($trunk.Name)' with $($trunk.Values.Count) value(s)."
-        Write-Output "          $($trunk.Description)"
-    }
-    Write-Output "=========================================================="
-    exit 0
-}
-
-# ---------------------------------------------------------------------------
 # Service control helpers
 # ---------------------------------------------------------------------------
 $utilsPath     = Join-Path $PSScriptRoot '..\..\utils'
@@ -208,8 +195,10 @@ function Start-VoicePlatformIfStopped {
 $vpSvc = Get-Service -Name 'VoicePlatform' -ErrorAction SilentlyContinue
 $vpInitialStatus = if ($vpSvc) { $vpSvc.Status } else { $null }
 
-Write-Output "${newline}Stopping VoicePlatform before applying registry changes..."
-Stop-VoicePlatformIfRunning
+if ($PSCmdlet.ShouldProcess('VoicePlatform', 'Stop service')) {
+    Write-Output "${newline}Stopping VoicePlatform before applying registry changes..."
+    Stop-VoicePlatformIfRunning
+}
 
 Write-Output "${newline}Creating $($missingTrunks.Count) missing trunk group(s)..."
 
@@ -229,13 +218,15 @@ foreach ($trunk in $missingTrunks) {
     }
 
     try {
-        New-Item -Path $keyPath -Force -ErrorAction Stop | Out-Null
-        foreach ($val in $trunk.Values) {
-            New-ItemProperty -Path $keyPath -Name $val.Name -Value $val.Value `
-                -PropertyType $val.Type -Force -ErrorAction Stop | Out-Null
+        if ($PSCmdlet.ShouldProcess($trunk.Name, 'Create registry key and values')) {
+            New-Item -Path $keyPath -Force -ErrorAction Stop | Out-Null
+            foreach ($val in $trunk.Values) {
+                New-ItemProperty -Path $keyPath -Name $val.Name -Value $val.Value `
+                    -PropertyType $val.Type -Force -ErrorAction Stop | Out-Null
+            }
+            Write-Output "    Result : SUCCESS ($($trunk.Values.Count) values written)"
+            $succeeded++
         }
-        Write-Output "    Result : SUCCESS ($($trunk.Values.Count) values written)"
-        $succeeded++
     }
     catch {
         Write-Error "    Result : FAILED - $($_.Exception.Message)"
@@ -247,8 +238,10 @@ foreach ($trunk in $missingTrunks) {
 # Restart service and report
 # ---------------------------------------------------------------------------
 if ($vpInitialStatus -eq 'Running') {
-    Write-Output "${newline}Restarting VoicePlatform service (it was running before this script ran)..."
-    Start-VoicePlatformIfStopped
+    if ($PSCmdlet.ShouldProcess('VoicePlatform', 'Start service')) {
+        Write-Output "${newline}Restarting VoicePlatform service (it was running before this script ran)..."
+        Start-VoicePlatformIfStopped
+    }
 }
 else {
     Write-Output "${newline}VoicePlatform service was not running before this script ran - leaving it stopped."
