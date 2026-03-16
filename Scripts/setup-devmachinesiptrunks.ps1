@@ -12,8 +12,9 @@
         3. GroupInternal         - NVP loopback / internal routing.
 
     The script checks which of these registry subkeys are already present on the
-    target machine. Any that are absent are created by importing the corresponding
-    .reg file bundled alongside this script.
+    target machine. Any that are absent are created directly via PowerShell registry
+    cmdlets. All registry values are defined inline in this script - no external
+    .reg files are required, so the script can be run standalone.
 
     Existing keys are NEVER overwritten - the script is additive only.
 
@@ -44,24 +45,47 @@ param()
 
 # ---------------------------------------------------------------------------
 # SIP trunk group definitions
-# Each entry maps a registry subkey name to a .reg file in this folder and
-# a human-readable description for reporting.
+# All registry values are defined inline - no external .reg files required.
+# Source of truth: exported from the reference dev machine on 2026-03-16 (NUB-1893).
 # ---------------------------------------------------------------------------
 $sipTrunks = @(
     [PSCustomObject]@{
         Name        = 'GroupNexbridgeCall'
-        RegFile     = Join-Path $PSScriptRoot 'GroupNexbridgeCall.reg'
         Description = 'Default Nexbridge outbound trunk (no prefix, pattern .*)'
+        Values      = @(
+            @{ Name = 'Pattern';           Value = '.*';                                Type = 'String'      }
+            @{ Name = 'DestinationFormat'; Value = 'sip:{0}@195.35.112.77';             Type = 'String'      }
+            @{ Name = 'TotalChannels';     Value = 30;                                  Type = 'DWord'       }
+            @{ Name = 'ExtraParameters';   Value = @('sipProxy=sip:10.200.8.5');        Type = 'MultiString' }
+            @{ Name = 'OriginatingFormat'; Value = 'sip:+442079406700@195.35.112.77';   Type = 'String'      }
+        )
     },
     [PSCustomObject]@{
         Name        = 'Group00321Teft'
-        RegFile     = Join-Path $PSScriptRoot 'Group00321Teft.reg'
         Description = 'TEFT calls trunk (dial prefix 321)'
+        Values      = @(
+            @{ Name = 'Pattern';           Value = '^321';                                                                                                       Type = 'String'      }
+            @{ Name = 'DestinationFormat'; Value = 'sip:{0}@pip-kamailio-telephony-testing-swedencentral.swedencentral.cloudapp.azure.com:5061;transport=tls';  Type = 'String'      }
+            @{ Name = 'TotalChannels';     Value = 30;                                                                                                           Type = 'DWord'       }
+            @{ Name = 'StripPrefixes';     Value = @('321');                                                                                                     Type = 'MultiString' }
+            @{ Name = 'ExtraParameters';   Value = @('sipProxy=sip:10.200.8.5');                                                                                 Type = 'MultiString' }
+            @{ Name = 'OriginatingFormat'; Value = 'sip:+442079406700@195.35.112.77';                                                                            Type = 'String'      }
+            @{ Name = 'CLIToPresent';      Value = '442079406700';                                                                                               Type = 'String'      }
+            @{ Name = 'CustomSIPHeaders';  Value = @('X-Noetica-Teft=letmein', 'X-Noetica-Convert-SRTP=1');                                                     Type = 'MultiString' }
+        )
     },
     [PSCustomObject]@{
         Name        = 'GroupInternal'
-        RegFile     = Join-Path $PSScriptRoot 'GroupInternal.reg'
         Description = 'NVP loopback / internal routing (Enhanced SIP Port, inbound)'
+        Values      = @(
+            @{ Name = 'Pattern';           Value = '^2';                                          Type = 'String'      }
+            @{ Name = 'DestinationFormat'; Value = 'sip:{0}@10.200.0.8';                          Type = 'String'      }
+            @{ Name = 'OriginatingFormat'; Value = '"Anonymous" <sip:anonymous@anonymous.invalid>'; Type = 'String'   }
+            @{ Name = 'TotalChannels';     Value = 5000;                                          Type = 'DWord'       }
+            @{ Name = 'Ports';             Value = @('Enhanced SIP Port');                        Type = 'MultiString' }
+            @{ Name = 'StripPrefixes';     Value = @('2');                                        Type = 'MultiString' }
+            @{ Name = 'CLIToPresent';      Value = '';                                            Type = 'String'      }
+        )
     }
 )
 
@@ -116,22 +140,11 @@ if ($missingTrunks.Count -eq 0) {
 if ($WhatIfPreference) {
     Write-Output "${newline}========== WhatIf: No changes will be made =========="
     foreach ($trunk in $missingTrunks) {
-        Write-Output "  WhatIf: Would import '$($trunk.Name)' from:"
-        Write-Output "          $($trunk.RegFile)"
+        Write-Output "  WhatIf: Would create registry key '$($trunk.Name)' with $($trunk.Values.Count) value(s)."
+        Write-Output "          $($trunk.Description)"
     }
     Write-Output "=========================================================="
     exit 0
-}
-
-# ---------------------------------------------------------------------------
-# Validate that all required .reg files exist before touching the service
-# ---------------------------------------------------------------------------
-$missingFiles = $missingTrunks | Where-Object { -not (Test-Path $_.RegFile) }
-if ($missingFiles) {
-    Write-Error "The following .reg source files are missing from $PSScriptRoot :"
-    $missingFiles | ForEach-Object { Write-Error "  $($_.RegFile)" }
-    Write-Error "Cannot proceed. Please ensure all .reg files are present alongside this script."
-    exit 1
 }
 
 # ---------------------------------------------------------------------------
@@ -192,40 +205,40 @@ function Start-VoicePlatformIfStopped {
 # Capture initial service state BEFORE stopping so we can restore it faithfully.
 # If the service was already stopped before this script ran, we must not start it
 # on the way out - that would silently change the machine's prior state.
-$vpInitialStatus = (Get-Service -Name 'VoicePlatform' -ErrorAction SilentlyContinue)?.Status
+$vpSvc = Get-Service -Name 'VoicePlatform' -ErrorAction SilentlyContinue
+$vpInitialStatus = if ($vpSvc) { $vpSvc.Status } else { $null }
 
 Write-Output "${newline}Stopping VoicePlatform before applying registry changes..."
 Stop-VoicePlatformIfRunning
 
-Write-Output "${newline}Importing $($missingTrunks.Count) missing trunk group(s)..."
+Write-Output "${newline}Creating $($missingTrunks.Count) missing trunk group(s)..."
 
 $succeeded = 0
 $failed    = 0
 
 foreach ($trunk in $missingTrunks) {
-    Write-Output "${newline}  Importing: $($trunk.Name)"
-    Write-Output "    File   : $($trunk.RegFile)"
+    $keyPath = Join-Path $baseKeyPath $trunk.Name
+    Write-Output "${newline}  Creating: $($trunk.Name)"
+    Write-Output "            $($trunk.Description)"
 
     # Re-check: another process may have created the key between our earlier
     # check and now (rare, but safe to guard against)
-    if (Test-Path (Join-Path $baseKeyPath $trunk.Name)) {
+    if (Test-Path $keyPath) {
         Write-Output "    Result : Key appeared since initial check - skipping (no overwrite)."
         continue
     }
 
     try {
-        $result = reg import $trunk.RegFile 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Write-Output "    Result : SUCCESS"
-            $succeeded++
+        New-Item -Path $keyPath -Force -ErrorAction Stop | Out-Null
+        foreach ($val in $trunk.Values) {
+            New-ItemProperty -Path $keyPath -Name $val.Name -Value $val.Value `
+                -PropertyType $val.Type -Force -ErrorAction Stop | Out-Null
         }
-        else {
-            Write-Error "    Result : FAILED (exit code $LASTEXITCODE) - $result"
-            $failed++
-        }
+        Write-Output "    Result : SUCCESS ($($trunk.Values.Count) values written)"
+        $succeeded++
     }
     catch {
-        Write-Error "    Result : EXCEPTION - $($_.Exception.Message)"
+        Write-Error "    Result : FAILED - $($_.Exception.Message)"
         $failed++
     }
 }
