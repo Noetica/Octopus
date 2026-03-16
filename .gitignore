@@ -22,9 +22,15 @@ synthesys.*
 !sample.reg
 !**/sample.reg
 
+# Except dev machine SIP trunk reg files
+!Scripts/Runbooks/SetupDevMachineSipTrunks/*.reg
+
 # Ignore sensitive REG files in any location
 **/synthesys.*.reg
 **/synthesys.reg
 
 # Ignore git-filter-repo/rewrite working directories
 .git-rewrite/
+
+# Ignore Visual Studio IDE workspace files
+.vs/

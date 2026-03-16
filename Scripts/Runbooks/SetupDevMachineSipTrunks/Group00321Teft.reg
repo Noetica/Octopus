@@ -1,0 +1,22 @@
+Windows Registry Editor Version 5.00
+
+; NUB-1893: Dev machine SIP trunk - TEFT calls (prefix 321)
+; Dial 321<number> to route through the TEFT KAMAILIO endpoint.
+; StripPrefixes removes "321" before forwarding.
+; Exported from this dev machine on 2026-03-16.
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Noetica\Voice Platform\Group00321Teft]
+"Pattern"="^321"
+"DestinationFormat"="sip:{0}@pip-kamailio-telephony-testing-swedencentral.swedencentral.cloudapp.azure.com:5061;transport=tls"
+"TotalChannels"=dword:0000001e
+"StripPrefixes"=hex(7):33,00,32,00,31,00,00,00,00,00
+"ExtraParameters"=hex(7):73,00,69,00,70,00,50,00,72,00,6f,00,78,00,79,00,3d,00,\
+  73,00,69,00,70,00,3a,00,31,00,30,00,2e,00,32,00,30,00,30,00,2e,00,38,00,2e,\
+  00,35,00,00,00,00,00
+"OriginatingFormat"="sip:+442079406700@195.35.112.77"
+"CLIToPresent"="442079406700"
+"CustomSIPHeaders"=hex(7):58,00,2d,00,4e,00,6f,00,65,00,74,00,69,00,63,00,61,\
+  00,2d,00,54,00,65,00,66,00,74,00,3d,00,6c,00,65,00,74,00,6d,00,65,00,69,00,\
+  6e,00,00,00,58,00,2d,00,4e,00,6f,00,65,00,74,00,69,00,63,00,61,00,2d,00,43,\
+  00,6f,00,6e,00,76,00,65,00,72,00,74,00,2d,00,53,00,52,00,54,00,50,00,3d,00,\
+  31,00,00,00,00,00
