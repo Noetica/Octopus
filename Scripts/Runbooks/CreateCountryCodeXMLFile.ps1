@@ -28,7 +28,6 @@ $xmlContent = @"
 <EnabledType>Optional</EnabledType>
 <Enabled>true</Enabled>
 <Classes>
-<Class>User</Class>
 <Class>Campaign</Class>
 <Class>OutboundList</Class>
 </Classes>
