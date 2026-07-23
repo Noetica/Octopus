@@ -40,7 +40,8 @@ function ControlService {
                 }
 
                 if ($counter -ge 60) {
-                    Write-Warning "Timeout: Registry value still exists after 60 attempts"
+                    Write-Error "Timeout: Registry value still exists after 60 attempts"
+                    exit 1
                 }
             }
         }
