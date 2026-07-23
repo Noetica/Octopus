@@ -30,13 +30,15 @@ function ControlService {
                     $exists = Get-ItemProperty -Path "HKLM:\Software\Noetica\Synthesys\Services\ControlPanel" -Name "Request" -ErrorAction SilentlyContinue
                     if (-not $exists) {
                         Write-Host "Registry value deleted. Continuing..."
+                        # Additional delay to allow file handles to be released
+                        Start-Sleep -Seconds 2
                         break
                     }
                     Write-Host "Registry value exists. Waiting... (attempt $($counter + 1)/60)"
                     Start-Sleep -Seconds 1
                     $counter++
                 }
-                
+
                 if ($counter -ge 60) {
                     Write-Error "Timeout: Registry value still exists after 60 attempts"
                     exit 1
@@ -60,7 +62,7 @@ function CommentInfLine {
 
     if (-not (Test-Path $FilePath)) {
         Write-Error "File not found: $FilePath"
-        return
+        exit 1
     }
 
     $lines = Get-Content $FilePath
@@ -89,24 +91,31 @@ function CommentInfLine {
         $modifiedLines += $line
     }
 
-    if (-not $madechange) {
-        Write-Output "No changes made. The specified text was not found or already commented."
-        return
+    if( -not $madechange) {
+        Write-Error "No changes made. The specified text was not found or already commented."
+        exit 1
     }
-
 
     # Create timestamped backup filename
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($FilePath)
     $dirName = [System.IO.Path]::GetDirectoryName($FilePath)
     $backupPath = Join-Path $dirName "$baseName.$timestamp.bak"
-    Rename-Item -Path $FilePath -NewName $backupPath -Force
+    
+    # Use try-catch to handle file access errors gracefully and provide clear feedback
+    try {
+        Rename-Item -Path $FilePath -NewName $backupPath -Force -ErrorAction Stop
 
-    # Save as ANSI (Windows-1252 encoding)
-    $ansiEncoding = [System.Text.Encoding]::GetEncoding(1252)
-    [System.IO.File]::WriteAllLines($FilePath, $modifiedLines, $ansiEncoding)
+        # Save as ANSI (Windows-1252 encoding)
+        $ansiEncoding = [System.Text.Encoding]::GetEncoding(1252)
+        [System.IO.File]::WriteAllLines($FilePath, $modifiedLines, $ansiEncoding)
 
-    Write-Output "File updated. Backup saved as $backupPath"
+        Write-Output "File updated. Backup saved as $backupPath"
+    }
+    catch {
+        Write-Error "Failed to update file '$FilePath': $_"
+        exit 1
+    }
 }
 
 function IsServiceCommented {
@@ -123,7 +132,7 @@ function IsServiceCommented {
 
     if (-not (Test-Path $FilePath)) {
         Write-Error "File not found: $FilePath"
-        return
+        exit 1
     }
 
     $lines = Get-Content $FilePath
@@ -152,21 +161,27 @@ function IsServiceCommented {
 # This script comments out a specific line in a section of an INF file that matches the specified text.
 # usage example:
 # CommentInfLine -FilePath "C:\Drivers\example.inf" -SectionName "Manufacturer" -SearchText "OldValue"
+
 $isServiceCommented = IsServiceCommented `
     -FilePath "C:\Synthesys\etc\synthesys.inf" `
     -SectionName "System Services" `
-    -SearchText "HouseKeeper.exe"
+    -SearchText "StartDiallerAPI.bat"
 
 if($isServiceCommented) {
-    Write-Output "Old HouseKeeper Service is not active. Exiting script."
+    Write-Output "DiallerAPI is not active. Exiting script."
     exit
 }
 
-ControlService -apiRequested "HouseKeeper" -operation "Stop"
+ControlService -apiRequested "DiallerAPI" -operation "Stop"
 
 CommentInfLine `
     -FilePath "C:\Synthesys\etc\synthesys.inf" `
     -SectionName "System Services" `
-    -SearchText "HouseKeeper.exe"
+    -SearchText "StartDiallerAPI.bat"
+
+Write-Output "DiallerAPI commented out."
 
 ControlService -operation "ReloadServices"
+
+Write-Output "Services Reloaded."
+
