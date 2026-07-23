@@ -25,7 +25,8 @@ function ControlService {
                 New-ItemProperty -Path "HKLM:\Software\Noetica\Synthesys\Services\ControlPanel" -Name "Request" -Value "${operation}:${name}" 
 
                 # Wait until the value is deleted
-                while ($true) {
+                $counter = 0
+                while ($counter -lt 60) {
                     $exists = Get-ItemProperty -Path "HKLM:\Software\Noetica\Synthesys\Services\ControlPanel" -Name "Request" -ErrorAction SilentlyContinue
                     if (-not $exists) {
                         Write-Host "Registry value deleted. Continuing..."
@@ -33,8 +34,13 @@ function ControlService {
                         Start-Sleep -Seconds 2
                         break
                     }
-                    Write-Host "Registry value exists. Waiting..."
+                    Write-Host "Registry value exists. Waiting... (attempt $($counter + 1)/60)"
                     Start-Sleep -Seconds 1
+                    $counter++
+                }
+
+                if ($counter -ge 60) {
+                    Write-Warning "Timeout: Registry value still exists after 60 attempts"
                 }
             }
         }
@@ -55,7 +61,7 @@ function CommentInfLine {
 
     if (-not (Test-Path $FilePath)) {
         Write-Error "File not found: $FilePath"
-        return
+        exit 1
     }
 
     $lines = Get-Content $FilePath
@@ -85,8 +91,8 @@ function CommentInfLine {
     }
 
     if( -not $madechange) {
-        Write-Output "No changes made. The specified text was not found or already commented."
-        return
+        Write-Error "No changes made. The specified text was not found or already commented."
+        exit 1
     }
 
     # Create timestamped backup filename
@@ -125,7 +131,7 @@ function IsServiceCommented {
 
     if (-not (Test-Path $FilePath)) {
         Write-Error "File not found: $FilePath"
-        return
+        exit 1
     }
 
     $lines = Get-Content $FilePath
@@ -151,9 +157,9 @@ function IsServiceCommented {
     return $false
 }
 
-# This script edits a specific section in an INF file, replacing occurrences of a specified text with new text.
+# This script comments out a specific line in a section of an INF file that matches the specified text.
 # usage example:
-# Edit-InfSection -FilePath "C:\Drivers\example.inf" -SectionName "Manufacturer" -SearchText "OldValue" -ReplacementText "NewValue"
+# CommentInfLine -FilePath "C:\Drivers\example.inf" -SectionName "Manufacturer" -SearchText "OldValue"
 
 $isServiceCommented = IsServiceCommented `
     -FilePath "C:\Synthesys\etc\synthesys.inf" `
