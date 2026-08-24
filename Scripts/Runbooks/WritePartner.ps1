@@ -68,6 +68,7 @@ Write-Host "  Key:   HKLM\$RegistrySubKey"
 Write-Host "  Name:  $RegistryName"
 Write-Host "  Value: '$Branding'"
 
+$didWrite = $false
 if ($PSCmdlet.ShouldProcess("HKLM\$RegistrySubKey\$RegistryName", "Set registry value to '$Branding'")) {
     $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
         [Microsoft.Win32.RegistryHive]::LocalMachine,
@@ -77,6 +78,7 @@ if ($PSCmdlet.ShouldProcess("HKLM\$RegistrySubKey\$RegistryName", "Set registry 
         $key = $baseKey.CreateSubKey($RegistrySubKey)
         try {
             $key.SetValue($RegistryName, $Branding, [Microsoft.Win32.RegistryValueKind]::String)
+            $didWrite = $true
             Write-Host "Registry value written successfully." -ForegroundColor Green
         }
         finally { $key.Close() }
@@ -84,8 +86,10 @@ if ($PSCmdlet.ShouldProcess("HKLM\$RegistrySubKey\$RegistryName", "Set registry 
     finally { $baseKey.Close() }
 }
 
-# Verify the value was written (read back from the same 64-bit view).
-if (-not $WhatIfPreference) {
+# Verify only when a write actually happened this run (skips WhatIf and a
+# declined -Confirm / ShouldProcess prompt, which would otherwise read back
+# and report a stale value as if it were just written).
+if ($didWrite) {
     $verifyBase = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
         [Microsoft.Win32.RegistryHive]::LocalMachine,
         [Microsoft.Win32.RegistryView]::Registry64)
@@ -93,8 +97,8 @@ if (-not $WhatIfPreference) {
         $verifyKey = $verifyBase.OpenSubKey($RegistrySubKey)
         if ($verifyKey) {
             try {
-                $written = $verifyKey.GetValue($RegistryName)
-                Write-Host "Verified: $RegistryName = '$written'" -ForegroundColor Cyan
+                $current = $verifyKey.GetValue($RegistryName)
+                Write-Host "Verified: $RegistryName = '$current'" -ForegroundColor Cyan
             }
             finally { $verifyKey.Close() }
         }
