@@ -129,7 +129,7 @@ if (-not (Test-Path -Path $InfPath -PathType Leaf)) {
     throw "File not found: '$InfPath'. Verify the Synthesys installation path before re-running."
 }
 
-$infLines     = Get-Content -Path $InfPath
+$infLines     = [System.IO.File]::ReadAllLines($InfPath, [System.Text.Encoding]::GetEncoding(1252))
 $sectionLines = Get-InfSectionLines -Lines $infLines -SectionName $InfSection
 $serviceLines = $sectionLines | Where-Object { $_ -like "*$StartBatchName*" }
 
