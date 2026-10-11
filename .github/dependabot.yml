@@ -1,0 +1,43 @@
+# Dependabot seed from nub_model_repository (ENG-18), chosen for the manifests this repository
+# tracks at its root. The standards sync replaces this file only while it is byte-identical to a
+# seed the hub has shipped: edit it and the repository owns it, with no further seed updates.
+# Grouped patch and minor updates are brought into the next feature branch by the `implement`
+# skill rather than merged alone; framework majors stay individual PRs.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    groups:
+      # Patch/minor updates are ignored below because the hub owns them, but a
+      # future major must keep the separately tracked CodeQL sub-actions on one
+      # version while it is reviewed and applied across the templates.
+      codeql-action-major:
+        patterns:
+          - "github/codeql-action*"
+        update-types:
+          - "major"
+      # Every other action update, majors included: they are pin bumps a reviewer can read.
+      github-actions:
+        patterns:
+          - "*"
+      github-actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    ignore:
+      # github/codeql-action lives only in the synced codeql-pr.yml /
+      # codeql-full.yml, whose versions are owned by nub_model_repository and
+      # force-copied over on every sync. A patch/minor bump here is pure noise the
+      # next sync overwrites anyway (in the hub, update-pinned-actions.rb keeps it
+      # current instead). Ignore only patch/minor — a MAJOR (e.g. a future v5)
+      # still surfaces so a human can bump the templates + the pinning allowlist.
+      # The trailing * covers the init / analyze / autobuild sub-actions Dependabot
+      # tracks as separate dependencies.
+      - dependency-name: "github/codeql-action*"
+        update-types:
+          - "version-update:semver-patch"
+          - "version-update:semver-minor"
