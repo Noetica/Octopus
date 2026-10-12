@@ -2,7 +2,9 @@
 # tracks at its root. The standards sync replaces this file only while it is byte-identical to a
 # seed the hub has shipped: edit it and the repository owns it, with no further seed updates.
 # Grouped patch and minor updates are brought into the next feature branch by the `implement`
-# skill rather than merged alone; framework majors stay individual PRs.
+# skill rather than merged alone. Where this seed configures npm or NuGet, their major versions are
+# not raised as version updates (a security fix that needs one still is); GitHub Actions majors
+# other than CodeQL join the actions group.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
