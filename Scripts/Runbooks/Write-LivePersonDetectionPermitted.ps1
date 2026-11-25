@@ -10,7 +10,7 @@
     Detection and the settings that need it. Its read fails closed:
         "yes" (case-insensitive, trimmed)                     -> the site may speak; the settings show
         anything else / missing / blank / unreadable           -> the settings stay hidden
-    This script therefore writes the variable's value VERBATIM and lets Campaign Manager interpret it.
+    This script therefore writes a single-line value verbatim and lets Campaign Manager interpret it.
 
     A missing or blank variable is NOT an error: it is logged and nothing is written, so the
     existing INF value remains in effect. To hide the settings again on a site that
@@ -59,7 +59,6 @@ $VariableName = 'LivePersonDetectionPermitted'
 if (-not $PSBoundParameters.ContainsKey('Permitted')) {
     if ($OctopusParameters -and $OctopusParameters[$VariableName]) {
         $Permitted = $OctopusParameters[$VariableName]
-        Write-Host "Using Octopus variable ${VariableName}: '$Permitted'"
     }
 }
 
@@ -68,6 +67,10 @@ if (-not $PSBoundParameters.ContainsKey('Permitted')) {
 if ([string]::IsNullOrWhiteSpace($Permitted)) {
     Write-Warning "$VariableName is not set (or blank). The existing INF value is unchanged. To disable Live Person Detection, run with 'no' and restart Campaign Manager."
     return
+}
+
+if ($Permitted -match '[\r\n]') {
+    throw "$VariableName must fit on one INF line."
 }
 
 if ([string]::IsNullOrWhiteSpace($InfPath) -and $OctopusParameters -and $OctopusParameters['Noetica.Inf']) {
