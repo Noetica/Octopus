@@ -40,6 +40,9 @@
 .NOTES
     See the ENG-971 spec (nub_specs specs/2026/eng-971-live-person-detection-as-lists-one-switch-covering),
     section 5, and its grill record (implementation question Q1).
+    Runs under Windows PowerShell 5.1 only: under PowerShell 7 the shared Write-OctopusVariablesToInf.ps1
+    reads and rewrites synthesys.inf as UTF-8, which corrupts non-ASCII text in its other settings.
+    The script refuses PowerShell 7 before writing anything (Ian Harrison, 25 Nov 2026).
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
@@ -50,6 +53,15 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$InfPath
 )
+
+# The shared INF writer reads and rewrites the whole file in PowerShell's default encoding, which is
+# UTF-8 under PowerShell 7: a Windows-1252 synthesys.inf then loses its non-ASCII characters.
+# ENG-1084 tracks fixing the shared writer; until then this runbook refuses PowerShell 7.
+if ($PSVersionTable.PSEdition -eq 'Core') {
+    throw "Write-LivePersonDetectionPermitted.ps1 must run under Windows PowerShell 5.1, not PowerShell $($PSVersionTable.PSVersion): " +
+        "the shared INF writer (Write-OctopusVariablesToInf.ps1) corrupts non-ASCII text in synthesys.inf under PowerShell 7. " +
+        "Nothing was written. Run this step under Windows PowerShell 5.1."
+}
 
 $Section      = 'Campaign Manager'
 $Key          = 'LivePersonDetectionPermitted'
