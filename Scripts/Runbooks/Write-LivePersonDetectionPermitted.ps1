@@ -8,7 +8,7 @@
 
     Campaign Manager reads this value to decide whether a site's lists are shown Live Person
     Detection and the settings that need it. Its read fails closed:
-        "yes" or "true" (case-insensitive, trimmed)           -> the site may speak; the settings show
+        "yes" (case-insensitive, trimmed)                     -> the site may speak; the settings show
         anything else / missing / blank / unreadable           -> the settings stay hidden
     This script therefore writes the variable's value VERBATIM and lets Campaign Manager interpret it.
 

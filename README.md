@@ -69,7 +69,7 @@ The repository mainly covers:
   Writes selected Octopus variables into `synthesys.inf` (or any INF) using explicit mappings in the form `Section|Key|Octopus.VariableName`.
 
 - `Scripts/Runbooks/Write-LivePersonDetectionPermitted.ps1`  
-  Writes `[Campaign Manager] LivePersonDetectionPermitted` into `synthesys.inf` from the tenant variable `LivePersonDetectionPermitted` (ENG-971). Campaign Manager shows Live Person Detection on a site's lists only when the value is `yes` or `true`. A missing or blank variable writes nothing, so the settings stay hidden. Restart Campaign Manager afterwards; it caches the INF.
+  Writes `[Campaign Manager] LivePersonDetectionPermitted` into `synthesys.inf` from the tenant variable `LivePersonDetectionPermitted` (ENG-971). Campaign Manager shows Live Person Detection on a site's lists only when the value is `yes` (any case). A missing or blank variable writes nothing, so the settings stay hidden. Restart Campaign Manager afterwards; it caches the INF.
 
 ## Writing Octopus Variables to INF
 
