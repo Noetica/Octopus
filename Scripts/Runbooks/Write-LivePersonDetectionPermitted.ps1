@@ -107,14 +107,14 @@ $params = @{
     CreateMissingSections = $true
 }
 
-& $writeInfScript @params
+& $writeInfScript @params -ErrorAction Stop
 
 # Verify only when a write could have happened this run (not under -WhatIf, which would read back
 # and report the old value as if it were just written).
 if (-not $WhatIfPreference) {
     $inSection = $false
     $current = $null
-    foreach ($line in [System.IO.File]::ReadAllLines((Resolve-Path -LiteralPath $InfPath).Path)) {
+    foreach ($line in (Get-Content -LiteralPath $InfPath -Encoding Default -ErrorAction Stop)) {
         if ($line -match '^\s*\[(.+)\]\s*$') {
             $inSection = ($matches[1] -eq $Section)
             continue
@@ -123,6 +123,9 @@ if (-not $WhatIfPreference) {
             $current = $matches[1]
             break
         }
+    }
+    if ($current -cne $Permitted) {
+        throw "Verification failed for [$Section] $Key in $InfPath. Expected '$Permitted', read '$current'."
     }
     Write-Host "Verified: [$Section] $Key = '$current'" -ForegroundColor Cyan
     Write-Host "Restart Campaign Manager for the change to apply (it caches synthesys.inf)."
