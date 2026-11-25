@@ -12,8 +12,8 @@
         anything else / missing / blank / unreadable           -> the settings stay hidden
     This script therefore writes the variable's value VERBATIM and lets Campaign Manager interpret it.
 
-    A missing or blank variable is NOT an error: it is logged and nothing is written, because a
-    site without the value is a site that may not speak. To hide the settings again on a site that
+    A missing or blank variable is NOT an error: it is logged and nothing is written, so the
+    existing INF value remains in effect. To hide the settings again on a site that
     has the value, set the variable to "no"; this script never removes the key.
 
     Campaign Manager caches synthesys.inf, so restart it after this runbook for the change to apply.
@@ -63,10 +63,10 @@ if (-not $PSBoundParameters.ContainsKey('Permitted')) {
     }
 }
 
-# A missing / blank value is by design safe: Campaign Manager keeps the settings hidden.
+# A missing or blank variable leaves the existing INF value in effect.
 # Do not fail the deployment over it -- warn and write nothing.
 if ([string]::IsNullOrWhiteSpace($Permitted)) {
-    Write-Warning "$VariableName is not set (or blank). Writing nothing; Live Person Detection stays hidden on this site's lists."
+    Write-Warning "$VariableName is not set (or blank). The existing INF value is unchanged. To disable Live Person Detection, run with 'no' and restart Campaign Manager."
     return
 }
 
