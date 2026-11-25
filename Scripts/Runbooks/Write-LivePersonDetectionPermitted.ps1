@@ -96,9 +96,12 @@ Write-Host "  Section: [$Section]"
 Write-Host "  Key:     $Key"
 Write-Host "  Value:   '$Permitted'"
 
+if (-not $PSCmdlet.ShouldProcess($InfPath, "Set [$Section] $Key to '$Permitted'")) {
+    return
+}
+
 # The helper resolves values via $OctopusParameters. Inject the value under the key used in the
-# mapping so the helper works with or without an Octopus context. -WhatIf reaches the helper
-# through $WhatIfPreference.
+# mapping so the helper works with or without an Octopus context.
 $OctopusParameters = @{ $VariableName = $Permitted }
 
 $params = @{
@@ -107,26 +110,22 @@ $params = @{
     CreateMissingSections = $true
 }
 
-& $writeInfScript @params -ErrorAction Stop
+& $writeInfScript @params -Confirm:$false -ErrorAction Stop
 
-# Verify only when a write could have happened this run (not under -WhatIf, which would read back
-# and report the old value as if it were just written).
-if (-not $WhatIfPreference) {
-    $inSection = $false
-    $current = $null
-    foreach ($line in (Get-Content -LiteralPath $InfPath -Encoding Default -ErrorAction Stop)) {
-        if ($line -match '^\s*\[(.+)\]\s*$') {
-            $inSection = ($matches[1] -eq $Section)
-            continue
-        }
-        if ($inSection -and $line -match ('^\s*' + [regex]::Escape($Key) + '\s*=(.*)$')) {
-            $current = $matches[1]
-            break
-        }
+$inSection = $false
+$current = $null
+foreach ($line in (Get-Content -LiteralPath $InfPath -Encoding Default -ErrorAction Stop)) {
+    if ($line -match '^\s*\[(.+)\]\s*$') {
+        $inSection = ($matches[1] -eq $Section)
+        continue
     }
-    if ($current -cne $Permitted) {
-        throw "Verification failed for [$Section] $Key in $InfPath. Expected '$Permitted', read '$current'."
+    if ($inSection -and $line -match ('^\s*' + [regex]::Escape($Key) + '\s*=(.*)$')) {
+        $current = $matches[1]
+        break
     }
-    Write-Host "Verified: [$Section] $Key = '$current'" -ForegroundColor Cyan
-    Write-Host "Restart Campaign Manager for the change to apply (it caches synthesys.inf)."
 }
+if ($current -cne $Permitted) {
+    throw "Verification failed for [$Section] $Key in $InfPath. Expected '$Permitted', read '$current'."
+}
+Write-Host "Verified: [$Section] $Key = '$current'" -ForegroundColor Cyan
+Write-Host "Restart Campaign Manager for the change to apply (it caches synthesys.inf)."
