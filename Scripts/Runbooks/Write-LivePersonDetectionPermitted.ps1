@@ -45,6 +45,7 @@
     The script refuses PowerShell 7 before writing anything (Ian Harrison, 25 Nov 2026).
 #>
 
+#Requires -Version 5.1
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Mandatory = $false)]
